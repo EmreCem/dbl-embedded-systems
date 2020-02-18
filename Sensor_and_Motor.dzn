@@ -1,0 +1,70 @@
+interface IDigitalOutput 
+{
+	in void setHigh();
+	in void setLow();
+	behaviour 
+	{
+		on setHigh: {}
+		on setLow: {}
+	}
+}
+
+interface IMotor
+{
+	in void setMotorHigh();
+	in void setMotorLow();
+	behaviour 
+	{
+		on setMotorHigh: {}
+		on setMotorLow: {}
+	}
+}
+
+interface IDigitalInput
+{
+	in void init();
+	enum InputState{Low, High};
+	in InputState getState();
+	out void toLowTrigger();
+	out void toHighTrigger();
+	behaviour 
+	{
+		enum State{Init, Low, High};
+		State state = State.Init;
+		
+		[state.Init]
+		{
+			on init:
+			{
+				state = State.Low;
+			}
+			on init:
+			{
+				state = State.High;
+			}	
+			on getState: illegal;	
+		}
+		
+		[state.Low]
+		{
+			on init: illegal;
+			on inevitable:
+			{
+				toHighTrigger;
+				state = State.High;
+			}	
+			on getState: reply(InputState.Low);	
+		}
+		
+		[state.High]
+		{
+			on init: illegal;
+			on inevitable:
+			{
+				toLowTrigger;
+				state = State.Low;
+			}	
+			on getState: reply(InputState.High);
+		}		
+	}
+}
