@@ -68,3 +68,41 @@ interface IDigitalInput
 		}		
 	}
 }
+
+interface ISensor 
+{
+	enum State { Init, Active };
+	in void init();
+	out void TriggeredHigh();
+	out void TriggeredLow();
+	behaviour 
+	{
+		State state = State.Init;
+		
+		[state.Init]
+		{
+			on init: 
+			{
+				state = State.Active;
+			}
+		}
+		
+		[state.Active]
+		{
+			on init: illegal;	
+			on inevitable: 
+			{
+				TriggeredHigh;				
+			}
+			on inevitable: 
+			{
+				TriggeredLow;				
+			}
+			on inevitable: 
+			{
+}
+}
+
+
+}
+}
