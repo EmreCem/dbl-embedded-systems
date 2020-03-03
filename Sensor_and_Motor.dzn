@@ -98,11 +98,18 @@ interface ISensor
 			{
 				TriggeredLow;				
 			}
-			on inevitable: 
-			{
-}
 }
 
 
 }
+}
+component Sensor {
+	provides ISensor iSensor;
+	requires IDigitalInput iDigitalInput;
+	requires IDigitalOutput iDigitalOutput;
+	behaviour {
+		on iSensor.init(): {} 
+		on iDigitalInput.toHighTrigger(): {}
+		on iDigitalInput.toLowTrigger(): {}
+	}
 }
