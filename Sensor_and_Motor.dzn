@@ -1,115 +1,75 @@
-interface IDigitalOutput 
+interface ITape //our tape of the Turing machine with 4 slots
 {
-	in void setHigh();
-	in void setLow();
-	behaviour 
+	in bool changing(); //is the binary value currently changing or representing
+	in void moveLeft(); 
+	in void moveRight(); 
+	out void stop(); //the tape has reached the correct position for changing a bit
+	behaviour
 	{
-		on setHigh: {}
-		on setLow: {}
+		enum State {waiting, moving};
+		State state = State.waiting;
+		on changing: reply (true);
+		on changing: reply (false);
+		on moveLeft: state = State.moving;
+  		on moveRight: state = State.moving;
+  		[state.moving] on optional: {stop; state = State.waiting;}
 	}
+	
 }
 
-interface IMotor
+interface IHead //the read/write head of the Turing machine
 {
-	in void setMotorHigh();
-	in void setMotorLow();
-	behaviour 
-	{
-		on setMotorHigh: {}
-		on setMotorLow: {}
-	}
+  	in bool bit(); //check what bit is in position
+  	in void push(); //take a certain bit into this position
+  	in void pull(); //remove the bit from this position
+  	behaviour
+  {
+  	enum State {single_state};
+  	State state = State.single_state;
+  	on bit: reply (true);
+  	on bit: reply (false); 
+  	on push: state = State.single_state;
+  	on pull: state = State.single_state;
+  }
 }
 
-interface IDigitalInput
+component ICountingMachine 
 {
-	in void init();
-	enum InputState{Low, High};
-	in InputState getState();
-	out void toLowTrigger();
-	out void toHighTrigger();
-	behaviour 
+	provides IHead ihead;
+	provides ITape itape;
+	
+	behaviour
 	{
-		enum State{Init, Low, High};
-		State state = State.Init;
+		enum State {empty, white_block, black_block, moving, stopping};
+		State state = State.empty;
 		
-		[state.Init]
-		{
-			on init:
-			{
-				state = State.Low;
-			}
-			on init:
-			{
-				state = State.High;
-			}	
-			on getState: illegal;	
 		}
 		
-		[state.Low]
-		{
-			on init: illegal;
-			on inevitable:
-			{
-				toHighTrigger;
-				state = State.High;
-			}	
-			on getState: reply(InputState.Low);	
-		}
-		
-		[state.High]
-		{
-			on init: illegal;
-			on inevitable:
-			{
-				toLowTrigger;
-				state = State.Low;
-			}	
-			on getState: reply(InputState.High);
-		}		
-	}
 }
 
-interface ISensor 
+interface OutputPin 
 {
-	enum State { Init, Active };
-	in void init();
-	out void TriggeredHigh();
-	out void TriggeredLow();
-	behaviour 
-	{
-		State state = State.Init;
-		
-		[state.Init]
-		{
-			on init: 
-			{
-				state = State.Active;
-			}
-		}
-		
-		[state.Active]
-		{
-			on init: illegal;	
-			on inevitable: 
-			{
-				TriggeredHigh;				
-			}
-			on inevitable: 
-			{
-				TriggeredLow;				
-			}
+  enum State {High,Low,Undefined};
+  	
+  in void pin_high();
+  in void pin_low();
+
+  behaviour
+  {
+  	State state = State.Undefined;
+  	
+  	on pin_high: state = State.High;
+  	on pin_low: state = State.Low;
+  }
 }
 
+interface InputPin 
+{
+  in bool read_pin();   
 
-}
-}
-component Sensor {
-	provides ISensor iSensor;
-	requires IDigitalInput iDigitalInput;
-	requires IDigitalOutput iDigitalOutput;
-	behaviour {
-		on iSensor.init(): {} 
-		on iDigitalInput.toHighTrigger(): {}
-		on iDigitalInput.toLowTrigger(): {}
-	}
+  behaviour
+  {
+    on read_pin: reply (true);
+    on read_pin: reply (false);
+  }
 }
