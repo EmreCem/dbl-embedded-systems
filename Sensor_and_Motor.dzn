@@ -80,6 +80,30 @@ component ICountingMachine
 			on head.pull():time_required.error(); //please not while tape is moving
 			on head.push():time_required.error(); //please not while tape is moving
 		}
+		[state.empty]
+		{
+			on head.bitDetect():time_required.error();//no bit
+			on head.tapeStopped():reply(true);
+			on head.pull(): {state = State.black_block || State.white_block;} //non-deterministic?
+			on head.push():time_required.error();
+		}
+		[state.black_block]
+		{
+			on head.bitDetect(): reply (false);
+			on head.tapeStopped(): reply (true);
+			on head.pull(): {time_required.error(); state = State.black_block;}
+			on head.push(): state = State.empty;	
+		}
+		[state.white_block]
+		{
+			on head.bitDetect(): reply (true);
+			on head.tapeStopped(): reply (true);
+			on head.pull(): {time_required.error(); state = State.white_block;}
+			on head.push(): state = State.empty;	
+		}		 				 		 				 
+		on tape.moveLeft(): state = State.moving;
+		on tape.moveRight(): state = State.moving;
+		on time_provided.error(): time_required.error();
 		}
 		
 }
