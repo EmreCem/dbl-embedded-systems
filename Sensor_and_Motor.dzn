@@ -1,27 +1,32 @@
 interface Time
 {
-	out void tick();
 	in void error();
+	out void tick();
 	
 	behaviour
 	{
 		enum State {single_state};
 		State state = State.single_state;
 		on error: state = State.single_state; // Replace by illegal if at some point you 
-		on optional: tick;                    // want to catch errors specified in components
+		on optional: tick;                   // want to catch errors specified in components
 											  // rather than on interfaces...
 	}
 }
 
-interface ITape //our tape of the Turing machine with 4 slots
+interface ITape //our tape of the Turing machine with 3 slots
 {
-	in void moveLeft(); 
-	in void moveRight(); 
-	out void stopTape(); //the tape has reached the correct position for changing a bit
+	in void moveLeft(); //goes one bit position to left 
+	in void moveRight(); //goes one bit position to right
+	out void positionIn1(); //The tape is in position to intake into bit position 1
+	out void positionIn2(); //The tape is in position to intake into bit position 2
+	out void positionIn3(); //The tape is in position to intake into bit position 3
+	out void positionOut1(); //The tape is in position to remove from bit position 1
+	out void positionOut2();//The tape is in position to remove from bit position 2
+	out void positionOut3();//The tape is in position to remove from bit position 3
 	behaviour
 	{
-		enum State {stopped, moving};
-		State state = State.stopped;
+		enum State {init, correctPosition, moving, wrongPosition};
+		State state = State.init;
 		on moveLeft: state = State.moving;
   		on moveRight: state = State.moving;
   		[state.moving] on optional: {stopTape; state = State.stopped;}
@@ -39,10 +44,10 @@ interface IHead //the read/write head of the Turing machine
   {
   	enum State {single_state};
   	State state = State.single_state;
-  	on bitDetect: reply (true);
+   	on bitDetect: reply (true);
   	on bitDetect: reply (false); 
-  	on tapeStopped(): reply (false);
-  	on tapeStopped(): reply (true);
+  	on tapeStopped: reply (false);
+  	on tapeStopped: reply (true);
   	on push: state = State.single_state;
   	on pull: state = State.single_state;
   }
@@ -80,12 +85,12 @@ component ICountingMachine
 			on head.pull():time_required.error(); //please not while tape is moving
 			on head.push():time_required.error(); //please not while tape is moving
 		}
-		[state.empty]
+		[state.empty] //state is empty
 		{
-			on head.bitDetect():time_required.error();//no bit
-			on head.tapeStopped():reply(true);
-			on head.pull(): {state = State.black_block || State.white_block;} //non-deterministic?
-			on head.push():time_required.error();
+			on head.bitDetect():time_required.error();//no bit so nothing to detect
+			on head.tapeStopped():reply(true); //tape doesn't move when slot is empty
+			on head.pull(): {state = State.black_block;} //non-deterministic?
+			on head.push():time_required.error(); //can't push anything while there is nothing to push
 		}
 		[state.black_block]
 		{
