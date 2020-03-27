@@ -1,3 +1,5 @@
+import bit_interfaces.dzn;
+
 interface Time
 {
 	in void error();
@@ -17,19 +19,14 @@ interface ITape //our tape of the Turing machine with 3 slots
 {
 	in void moveLeft(); //goes one bit position to left 
 	in void moveRight(); //goes one bit position to right
-	out void positionIn1(); //The tape is in position to intake into bit position 1
-	out void positionIn2(); //The tape is in position to intake into bit position 2
-	out void positionIn3(); //The tape is in position to intake into bit position 3
-	out void positionOut1(); //The tape is in position to remove from bit position 1
-	out void positionOut2();//The tape is in position to remove from bit position 2
-	out void positionOut3();//The tape is in position to remove from bit position 3
+	in bool positionIn(); //The tape is in position to intake a bit;
+	in bool positionOut(); //The tape is in position to intake a bit;
 	behaviour
 	{
 		enum State {init, correctPosition, moving, wrongPosition};
 		State state = State.init;
 		on moveLeft: state = State.moving;
   		on moveRight: state = State.moving;
-  		[state.moving] on optional: {stopTape; state = State.stopped;}
 	}
 	
 }
@@ -66,51 +63,84 @@ interface ILCD //LCD screen
   }
 }
 
-component ICountingMachine 
+interface IFloorPicker //component that picks from factory floor
+{
+	in void pushBlack();
+	in void pushWhite();
+	behaviour
+	{
+		enum State {blackRequestedInPosition, whiteRequestedInPosition, wait};
+		State state = State.wait;
+		[state.blackRequestedInPosition] {
+			on pushBlack: state = State.wait;
+			}
+		[state.whiteRequestedInPosition] {
+			on pushWhite: state = State.wait;
+			}
+	}
+}
+component FloorPicker
+{
+	provides IFloorPicker floorPicker;
+	requires ITape tape;
+	
+}
+
+component CountingMachineHead
+{
+	
+}
+
+component CountingMachineTape 
 {
 	provides Time time_provided;
 	requires Time time_required;
-	provides IHead head;
+	requires IHead head;
+	requires IFloorPicker floorPicker;
 	provides ITape tape;
 	provides ILCD lcd;
+	provides IBit_1 bit_1;
+	provides IBit_2 bit_2;
+	provides IBit_3 bit_3;
+	
 	
 	behaviour
 	{
-		enum State {empty, white_block, black_block, moving, stopping};
-		State state = State.empty;
-		[state.moving || state.stopping]
+		enum State {init, incrementing};
+		State state = State.init;
+		[state.init] //initial move, waiting to fill every bit with white before anything
 		{
-			on head.bitDetect():time_required.error();//don't detect bits while tape is changing position
-			on head.tapeStopped():reply(false);	//no tape is not stopped
-			on head.pull():time_required.error(); //please not while tape is moving
-			on head.push():time_required.error(); //please not while tape is moving
+			on tape.moveLeft(): state = State.init;
+			on tape.moveRight(): state = State.init;
+			on tape.positionIn(): floorPicker.pushWhite();
+			on bit_1.white_in(), bit_2.white_in(), bit_3.white_in(): {
+				state = State.incrementing;
+			}
 		}
-		[state.empty] //state is empty
+		[state.incrementing] // can start incrementing the represented value
 		{
-			on head.bitDetect():time_required.error();//no bit so nothing to detect
-			on head.tapeStopped():reply(true); //tape doesn't move when slot is empty
-			on head.pull(): {state = State.black_block;} //non-deterministic?
-			on head.push():time_required.error(); //can't push anything while there is nothing to push
-		}
-		[state.black_block]
-		{
-			on head.bitDetect(): reply (false);
-			on head.tapeStopped(): reply (true);
-			on head.pull(): {time_required.error(); state = State.black_block;}
-			on head.push(): state = State.empty;	
-		}
-		[state.white_block]
-		{
-			on head.bitDetect(): reply (true);
-			on head.tapeStopped(): reply (true);
-			on head.pull(): {time_required.error(); state = State.white_block;}
-			on head.push(): state = State.empty;	
+			
+			on bit_1.clear(), tape.positionOut(): {head.push(); state = State.incrementing;}
+			on bit_2.clear(), tape.positionOut(): {head.push(); state = State.incrementing;}
+			on bit_3.clear(), tape.positionOut(): {head.push(); state = State.incrementing;}
+			on bit_1.black_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
+			on bit_2.black_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
+			on bit_3.black_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
+			on bit_1.white_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
+			on bit_2.white_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
+			on bit_3.white_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
+			on tape.moveLeft(): state = State.incrementing;
+			on tape.moveRight(): state = State.incrementing;
 		}		 				 		 				 
-		on tape.moveLeft(): state = State.moving;
-		on tape.moveRight(): state = State.moving;
 		on time_provided.error(): time_required.error();
+		
+		on time_required.tick():
+	   {
+			[state.init] time_provided.tick();
+			[state.incrementing] time_provided.tick();		 
 		}
 		
+		}
 }
 
 interface OutputPin 
