@@ -19,8 +19,10 @@ interface ITape //our tape of the Turing machine with 3 slots
 {
 	in void moveLeft(); //goes one bit position to left 
 	in void moveRight(); //goes one bit position to right
-	in bool positionIn(); //The tape is in position to intake a bit;
-	in bool positionOut(); //The tape is in position to intake a bit;
+	in void dontMove(); //do not move 
+	out void tapeStopped(); //belt is moving or stopped
+	out void positionIn(); //The tape is in position to intake bit;
+	out void positionOut(); //The tape is in position to output bit;
 	behaviour
 	{
 		enum State {init, correctPosition, moving, wrongPosition};
@@ -33,20 +35,17 @@ interface ITape //our tape of the Turing machine with 3 slots
 
 interface IHead //the read/write head of the Turing machine
 {
-  	in bool bitDetect(); //check what bit is in position
-  	in bool tapeStopped(); //check if belt is moving or stopped
+	in void checkSequence();
   	in void push(); //take a certain bit into this position
   	in void pull(); //remove the bit from this position
+  	out void sequence();
   	behaviour
   {
   	enum State {single_state};
   	State state = State.single_state;
-   	on bitDetect: reply (true);
-  	on bitDetect: reply (false); 
-  	on tapeStopped: reply (false);
-  	on tapeStopped: reply (true);
   	on push: state = State.single_state;
   	on pull: state = State.single_state;
+  	on checkSequence: state = State.single_state;
   }
 }
 
@@ -65,8 +64,9 @@ interface ILCD //LCD screen
 
 interface IFloorPicker //component that picks from factory floor
 {
-	in void pushBlack();
-	in void pushWhite();
+	in void pushBlack(); //push the first black disk you come by
+	in void pushWhite(); //push the first white disk you come by
+	in void letPass(); //let all bits pass
 	behaviour
 	{
 		enum State {blackRequestedInPosition, whiteRequestedInPosition, wait};
@@ -81,13 +81,37 @@ interface IFloorPicker //component that picks from factory floor
 }
 component FloorPicker
 {
+	provides Time time_provided;
+	requires Time time_required;
 	provides IFloorPicker floorPicker;
 	requires ITape tape;
+	requires IHead head;
+	requires IBit_1 bit_1;
+	requires IBit_2 bit_2;
+	requires IBit_3 bit_3;
+	behaviour 
+	{
+		enum State {waiting, picking};
+		State state = State.waiting;
+		[state.waiting]
+		{
+			on floorPicker.letPass(): {state = State.waiting;}
+			on tape.tapeStopped(), tape.positionIn(): {tape.dontMove(); state = State.picking;}
+		}
+		[state.picking]
+		{
+			on floorPicker.pushBlack(): {state = State.waiting;}
+			on floorPicker.pushWhite(): {state = State.waiting;}
+			on bit_1.full(), bit_2.full(), bit_3.full(): {time_required.error(); state = State.waiting;} //if all bits are full, error
+		}
+	}
 	
 }
 
 component CountingMachineHead
 {
+	provides IHead head;
+	requires IFloorPicker floorPicker;
 	
 }
 
