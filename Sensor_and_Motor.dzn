@@ -1,6 +1,6 @@
 import bit_interfaces.dzn;
 
-interface Time
+interface Communication //used to be time, communication interface now. Because these will be functions of communication with mqtt
 {
 	in void error();
 	out void tick();
@@ -9,9 +9,8 @@ interface Time
 	{
 		enum State {single_state};
 		State state = State.single_state;
-		on error: state = State.single_state; // Replace by illegal if at some point you 
-		on optional: tick;                   // want to catch errors specified in components
-											  // rather than on interfaces...
+		on error: state = State.single_state; 
+		on optional: tick;                   
 	}
 }
 
@@ -81,8 +80,8 @@ interface IFloorPicker //component that picks from factory floor
 }
 component FloorPicker
 {
-	provides Time time_provided;
-	requires Time time_required;
+	provides Communication Communication_provided;
+	requires Communication Communication_required;
 	provides IFloorPicker floorPicker;
 	requires ITape tape;
 	requires IHead head;
@@ -102,7 +101,7 @@ component FloorPicker
 		{
 			on floorPicker.pushBlack(): {state = State.waiting;}
 			on floorPicker.pushWhite(): {state = State.waiting;}
-			on bit_1.full(), bit_2.full(), bit_3.full(): {time_required.error(); state = State.waiting;} //if all bits are full, error
+			on bit_1.full(), bit_2.full(), bit_3.full(): {Communication_required.error(); head.checkSequence() ;state = State.waiting;} //if all bits are full, error and check sequence
 		}
 	}
 	
@@ -110,15 +109,40 @@ component FloorPicker
 
 component CountingMachineHead
 {
+	provides Communication Communication_provided;
+	requires Communication Communication_required;
 	provides IHead head;
 	requires IFloorPicker floorPicker;
+	provides ILCD lcd;
+	requires ITape tape;
+	requires IBit_1 bit_1;
+	requires IBit_2 bit_2;
+	requires IBit_3 bit_3;
+	behaviour 
+	{
+		enum State {scanning, notScanning};
+		State state = State.notScanning;
+		[state.notScanning]
+		{
+			on head.checkSequence(): {head.sequence(); state = State.scanning;}
+			on lcd.getValue(): {lcd.showValue(); state = State.notScanning;}
+			on head.pull(): {floorPicker.pushBlack(); state = State.notScanning;}
+			on head.pull(): {floorPicker.pushWhite(); state = State.notScanning;}
+		}
+		[state.scanning]
+		{
+			on head.pull(): {Communication_required.error();}
+			on head.push(): {Communication_required.error();}
+		}
+	}
+	
 	
 }
 
 component CountingMachineTape 
 {
-	provides Time time_provided;
-	requires Time time_required;
+	provides Communication Communication_provided;
+	requires Communication Communication_required;
 	requires IHead head;
 	requires IFloorPicker floorPicker;
 	provides ITape tape;
@@ -156,12 +180,12 @@ component CountingMachineTape
 			on tape.moveLeft(): state = State.incrementing;
 			on tape.moveRight(): state = State.incrementing;
 		}		 				 		 				 
-		on time_provided.error(): time_required.error();
+		on Communication_provided.error(): Communication_required.error();
 		
-		on time_required.tick():
+		on Communication_required.tick():
 	   {
-			[state.init] time_provided.tick();
-			[state.incrementing] time_provided.tick();		 
+			[state.init] Communication_provided.tick();
+			[state.incrementing] Communication_provided.tick();		 
 		}
 		
 		}
