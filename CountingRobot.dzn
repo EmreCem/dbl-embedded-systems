@@ -24,10 +24,11 @@ interface ITape //our tape of the Turing machine with 3 slots
 	out void positionOut(); //The tape is in position to output bit;
 	behaviour
 	{
-		enum State {init, correctPosition, moving, wrongPosition};
-		State state = State.init;
+		enum State {moving, stopping};
+		State state = State.stopping;
 		on moveLeft: state = State.moving;
   		on moveRight: state = State.moving;
+  		on dontMove: state = State.stopping;
 	}
 	
 }
@@ -113,11 +114,7 @@ component CountingMachineHead
 	requires Communication Communication_required;
 	provides IHead head;
 	requires IFloorPicker floorPicker;
-	provides ILCD lcd;
 	requires ITape tape;
-	requires IBit_1 bit_1;
-	requires IBit_2 bit_2;
-	requires IBit_3 bit_3;
 	behaviour 
 	{
 		enum State {scanning, notScanning};
@@ -125,7 +122,6 @@ component CountingMachineHead
 		[state.notScanning]
 		{
 			on head.checkSequence(): {head.sequence(); state = State.scanning;}
-			on lcd.getValue(): {lcd.showValue(); state = State.notScanning;}
 			on head.pull(): {floorPicker.pushBlack(); state = State.notScanning;}
 			on head.pull(): {floorPicker.pushWhite(); state = State.notScanning;}
 		}
@@ -146,74 +142,75 @@ component CountingMachineTape
 	requires IHead head;
 	requires IFloorPicker floorPicker;
 	provides ITape tape;
-	provides ILCD lcd;
 	provides IBit_1 bit_1;
 	provides IBit_2 bit_2;
 	provides IBit_3 bit_3;
-	
-	
 	behaviour
 	{
-		enum State {init, incrementing};
+		enum State {moving, stopped};
+		State state = State.stopped;
+		[state.stopped]
+		{
+			on tape.moveLeft(), tape.moveRight(): state = State.moving;
+		}
+		[state.moving]
+		{
+			on tape.dontMove(): state = State.stopped;
+		}
+	}
+		
+}
+
+interface IController
+{
+	in void incrementValue();
+	in void representValue();
+	out void value();
+	behaviour 
+	{
+	enum State {init, incrementing, pausing};
 		State state = State.init;
-		[state.init] //initial move, waiting to fill every bit with white before anything
-		{
-			on tape.moveLeft(): state = State.init;
-			on tape.moveRight(): state = State.init;
-			on tape.positionIn(): floorPicker.pushWhite();
-			on bit_1.white_in(), bit_2.white_in(), bit_3.white_in(): {
-				state = State.incrementing;
-			}
-		}
-		[state.incrementing] // can start incrementing the represented value
-		{
-			
-			on bit_1.clear(), tape.positionOut(): {head.push(); state = State.incrementing;}
-			on bit_2.clear(), tape.positionOut(): {head.push(); state = State.incrementing;}
-			on bit_3.clear(), tape.positionOut(): {head.push(); state = State.incrementing;}
-			on bit_1.black_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
-			on bit_2.black_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
-			on bit_3.black_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
-			on bit_1.white_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
-			on bit_2.white_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
-			on bit_3.white_in(), tape.positionIn(): {head.pull(); state = State.incrementing;}
-			on tape.moveLeft(): state = State.incrementing;
-			on tape.moveRight(): state = State.incrementing;
-		}		 				 		 				 
-		on Communication_provided.error(): Communication_required.error();
-		
-		on Communication_required.tick():
-	   {
-			[state.init] Communication_provided.tick();
-			[state.incrementing] Communication_provided.tick();		 
-		}
-		
-		}
+	on incrementValue: state = State.incrementing;
+		on representValue: state = State.pausing;
+	}
 }
-
-interface OutputPin 
+component Controller 
 {
-  enum State {High,Low,Undefined};
-  	
-  in void pin_high();
-  in void pin_low();
-
-  behaviour
-  {
-  	State state = State.Undefined;
-  	
-  	on pin_high: state = State.High;
-  	on pin_low: state = State.Low;
-  }
+	provides Communication Communication_provided;
+	requires Communication Communication_required;
+	behaviour {}
 }
 
-interface InputPin 
+
+component System //I cant
 {
-  in bool read_pin();   
+	
+	
+	system
+	{
+		
+		FloorPicker FloorPicker;
+		CountingMachineHead Head;
+		CountingMachineTape Tape;
+		Controller controller;
+	
+		FloorPicker.Communication_provided <=> controller.Communication_required;
+		FloorPicker.Communication_required <=> controller.Communication_provided;
+		Head.Communication_provided <=> controller.Communication_required;
+		Head.Communication_required <=> controller.Communication_provided;
+		Tape.Communication_provided <=> controller.Communication_required;
+		Tape.Communication_required <=> controller.Communication_provided;
+		Head.tape <=> Tape.tape;
+		Tape.head <=> Head.head;
+		Tape.floorPicker <=> FloorPicker.floorPicker;
+		FloorPicker.head <=> Head.head;
+		FloorPicker.tape <=> Tape.tape;
+		FloorPicker.bit_1 <=> Tape.bit_1;
+		FloorPicker.bit_2 <=> Tape.bit_2;
+		FloorPicker.bit_3 <=> Tape.bit_3;
+		Head.floorPicker <=> FloorPicker.floorPicker;
+	}	
+	}
 
-  behaviour
-  {
-    on read_pin: reply (true);
-    on read_pin: reply (false);
-  }
-}
+
+
