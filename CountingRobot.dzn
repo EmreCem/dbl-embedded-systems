@@ -3,14 +3,23 @@ import bit_interfaces.dzn;
 interface Communication //used to be time, communication interface now. Because these will be functions of communication with mqtt
 {
 	in void error();
-	out void tick();
+	in void tick();
+	in void errorProcedure();
 	
 	behaviour
 	{
-		enum State {single_state};
-		State state = State.single_state;
-		on error: state = State.single_state; 
-		on optional: tick;                   
+		enum State {heartbeat, error};
+		State state = State.heartbeat;
+		on error: state = State.error;
+		[state.heartbeat]  
+		{
+			on tick:{}
+		}        
+		[state.error]
+		{
+			on errorProcedure:{state = State.heartbeat;}
+		}
+		
 	}
 }
 
