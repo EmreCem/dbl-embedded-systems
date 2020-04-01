@@ -171,130 +171,96 @@ interface IFloorPusher
 
 component FloorPicker
 {
-	provides Communication Communication_provided;
-	requires Communication Communication_required;
-	provides IFloorPicker floorPicker;
-	requires ITape tape;
-	requires IHead head;
-	requires IBit_1 bit_1;
-	requires IBit_2 bit_2;
-	requires IBit_3 bit_3;
+	provides IFloorSensor iFloorSensor;
+	provides IFloorPusher iFloorPusher;
 	behaviour 
 	{
-		enum State {waiting, picking};
-		State state = State.waiting;
-		[state.waiting]
-		{
-			on floorPicker.letPass(): {state = State.waiting;}
-			on tape.tapeStopped(), tape.positionIn(): {tape.dontMove(); state = State.picking;}
-		}
-		[state.picking]
-		{
-			on floorPicker.pushBlack(): {state = State.waiting;}
-			on floorPicker.pushWhite(): {state = State.waiting;}
-			on bit_1.full(), bit_2.full(), bit_3.full(): {Communication_required.error(); head.checkSequence() ;state = State.waiting;} //if all bits are full, error and check sequence
-		}
+		
 	}
 	
 }
 
-component CountingMachineHead
+component Head
 {
-	provides Communication Communication_provided;
-	requires Communication Communication_required;
-	provides IHead head;
-	requires IFloorPicker floorPicker;
-	requires ITape tape;
+	provides ITapePusher iTapePusher;
+	provides ITapeColorSensor iTapeColorSensor;
+	provides IDiskSensor iDiskSensor;
 	behaviour 
 	{
-		enum State {scanning, notScanning};
-		State state = State.notScanning;
-		[state.notScanning]
-		{
-			on head.checkSequence(): {head.sequence(); state = State.scanning;}
-			on head.pull(): {floorPicker.pushBlack(); state = State.notScanning;}
-			on head.pull(): {floorPicker.pushWhite(); state = State.notScanning;}
-		}
-		[state.scanning]
-		{
-			on head.pull(): {Communication_required.error();}
-			on head.push(): {Communication_required.error();}
-		}
+		
 	}
-	
-	
 }
 
-component CountingMachineTape 
+component LCD 
 {
-	provides Communication Communication_provided;
-	requires Communication Communication_required;
-	requires IHead head;
-	requires IFloorPicker floorPicker;
-	provides ITape tape;
-	provides IBit_1 bit_1;
-	provides IBit_2 bit_2;
-	provides IBit_3 bit_3;
+	provides ILCD iLCD;
+	behaviour
+	{	
+	}
+}
+
+component Tape 
+{
+	provides ITape iTape;
 	behaviour
 	{
-		enum State {moving, stopped};
-		State state = State.stopped;
-		[state.stopped]
-		{
-			on tape.moveLeft(), tape.moveRight(): state = State.moving;
-		}
-		[state.moving]
-		{
-			on tape.dontMove(): state = State.stopped;
-		}
 	}
 		
 }
 
 interface IController
 {
-	out void incrementValue();
-	out void representValue();
-	behaviour 
-	{
-	enum State {init, incrementing, pausing};
-		State state = State.init;
-	on incrementValue: state = State.incrementing;
-	on representValue: state = State.pausing;
-	}
+	in void init();
+	out void increment();
+	in void update();
+	in void error();
+	// bits need white or black 
+	// and can be filled or empty
+	behaviour{
+	enum bit_state {white, black, none};
+	bit_state bit_1;
+	bit_state bit_2;
+	bit_state bit_3;
+	}	
 }
+
 component Controller 
 {
-	provides Communication Communication_provided;
-	requires Communication Communication_required;
-	provides IController controller;
-	behaviour {}
+	provides IController iController;
+	requires ITape itape;
+	requires ILCD iLCD;
+	requires ITapePusher iTapePusher;
+	requires ITapeColorSensor iTapeColorSensor;
+	requires IDiskSensor iDiskSensor;
+	requires IFloorSensor iFloorSensor;
+	requires IFloorPusher iFloorPusher;
+	behaviour 
+	{
+		
+	}
 }
 
 
 component System //I cant
 {
-	
+	provides IController iController;
 	
 	system
 	{
-		FloorPicker FloorPicker;
-		CountingMachineHead Head;
-		CountingMachineTape Tape;
 		Controller controller;
-	
-		FloorPicker.Communication_provided <=> controller.Communication_required;
-		FloorPicker.Communication_required <=> controller.Communication_provided;
-		Head.Communication_provided <=> controller.Communication_required;
-		Head.tape <=> Tape.tape;
-		Tape.head <=> Head.head;
-		Tape.floorPicker <=> FloorPicker.floorPicker;
-		FloorPicker.head <=> Head.head;
-		FloorPicker.tape <=> Tape.tape;
-		FloorPicker.bit_1 <=> Tape.bit_1;
-		FloorPicker.bit_2 <=> Tape.bit_2;
-		FloorPicker.bit_3 <=> Tape.bit_3;
-		Head.floorPicker <=> FloorPicker.floorPicker;
+		Tape tape;
+		LCD lcd;
+		Head head;
+		FloorPicker floorpicker;
+		
+		iController<=>controller.iController;
+		controller.iDiskSensor<=>head.iDiskSensor;
+		controller.iTapeColorSensor<=>head.iTapeColorSensor;
+		controller.iTapePusher<=>head.iTapePusher;
+		controller.iLCD<=>lcd.iLCD;
+		controller.itape<=>tape.iTape;
+		controller.iFloorPusher<=>floorpicker.iFloorPusher;
+		controller.iFloorSensor<=>floorpicker.iFloorSensor;
 	}	
 	}
 
