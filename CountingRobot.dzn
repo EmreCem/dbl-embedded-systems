@@ -33,8 +33,9 @@ interface ITape //our tape of the Turing machine with 3 slots
 	
 }
 
-interface IHead //the read/write head of the Turing machine
-{
+/* interface IHeadSensor //Sensor on Tape
+ {
+	
 	in void checkSequence();
   	in void push(); //take a certain bit into this position
   	in void pull(); //remove the bit from this position
@@ -48,17 +49,62 @@ interface IHead //the read/write head of the Turing machine
   	on checkSequence: state = State.single_state;
   }
 }
+* 
+*/
+interface ITapeColorSensor //Sensor on Tape
+{
+	out void colorSensed(); //empty, white or black
+  	behaviour
+  {
+  	enum State {single_state};
+  	State state = State.single_state;
+  	on colorSensed: state = State.single_state;
+  }
+} 
+
+
+interface IDiskSensor
+{
+	in void diskSensed();
+	out void diskColor();
+	behaviour
+	{
+	enum State {noDisk, diskPresent};
+	State state = State.noDisk;
+	on diskSensed(): state = State.diskPresent;
+	[state.diskPresent]
+	{
+		diskColor; //check the color when disk is present
+	}
+	}
+}
+
+interface ITapePusher
+{
+	in void push();
+	out void pushComplete();
+	behaviour
+	{
+		enum State {waiting, pushing};
+		State state = State.waiting;
+		on push(): state = State.pushing;
+		[state.pushing]
+		{
+			on pushComplete(): state = State.waiting;
+		}
+	}
+}
 
 interface ILCD //LCD screen
 {
   	in void getValue();
-  	out void showValue();
+  	in void showValue();
   	behaviour
   {
   	enum State {single_state};
   	State state = State.single_state;
   	on getValue: state = State.single_state;
-  	[state.single_state] on optional: {showValue; state = State.single_state;}
+  	on showValue: state = State.single_state;
   }
 }
 
@@ -163,21 +209,21 @@ component CountingMachineTape
 
 interface IController
 {
-	in void incrementValue();
-	in void representValue();
-	out void value();
+	out void incrementValue();
+	out void representValue();
 	behaviour 
 	{
 	enum State {init, incrementing, pausing};
 		State state = State.init;
 	on incrementValue: state = State.incrementing;
-		on representValue: state = State.pausing;
+	on representValue: state = State.pausing;
 	}
 }
 component Controller 
 {
 	provides Communication Communication_provided;
 	requires Communication Communication_required;
+	provides IController controller;
 	behaviour {}
 }
 
@@ -188,7 +234,6 @@ component System //I cant
 	
 	system
 	{
-		
 		FloorPicker FloorPicker;
 		CountingMachineHead Head;
 		CountingMachineTape Tape;
@@ -197,9 +242,6 @@ component System //I cant
 		FloorPicker.Communication_provided <=> controller.Communication_required;
 		FloorPicker.Communication_required <=> controller.Communication_provided;
 		Head.Communication_provided <=> controller.Communication_required;
-		Head.Communication_required <=> controller.Communication_provided;
-		Tape.Communication_provided <=> controller.Communication_required;
-		Tape.Communication_required <=> controller.Communication_provided;
 		Head.tape <=> Tape.tape;
 		Tape.head <=> Head.head;
 		Tape.floorPicker <=> FloorPicker.floorPicker;
