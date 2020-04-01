@@ -62,6 +62,7 @@ interface ITape //our tape of the Turing machine with 3 slots
 */
 interface ITapeColorSensor //Sensor on Tape
 {
+	in void getColor();
 	out void colorSensed(); //empty, white or black
   	behaviour
   {
@@ -152,6 +153,15 @@ interface IFloorSensor
 	}
 }
 
+interface IHead
+{
+	in void goPos1();
+	behaviour
+	{
+		
+	}
+}
+
 interface IFloorPusher
 {
 	in void push();
@@ -168,7 +178,6 @@ interface IFloorPusher
 	}
 }
 
-
 component FloorPicker
 {
 	provides IFloorSensor iFloorSensor;
@@ -182,9 +191,12 @@ component FloorPicker
 
 component Head
 {
-	provides ITapePusher iTapePusher;
-	provides ITapeColorSensor iTapeColorSensor;
-	provides IDiskSensor iDiskSensor;
+	provides IHead iHead;
+	requires ITapePusher iTapePusher;
+	requires ITapeColorSensor iTapeColorSensor;
+	requires IDiskSensor iDiskSensor;
+	requires IController iController;
+	requires ITape iTape;
 	behaviour 
 	{
 		
@@ -234,14 +246,41 @@ component Controller
 	requires IDiskSensor iDiskSensor;
 	requires IFloorSensor iFloorSensor;
 	requires IFloorPusher iFloorPusher;
+	requires IHead iHead;
 	behaviour 
 	{
 		
 	}
 }
 
+component TapePusher
+{
+	provides ITapePusher iTapePusher;
+	behaviour
+	{
+		
+	}
+}
+component TapeColorSensor
+{
+	provides ITapeColorSensor iTapeColorSensor;
+	behaviour
+	{
+		
+	}
+}
 
-component System //I cant
+component DiskSensor
+{
+	provides IDiskSensor iDiskSensor;
+	behaviour
+	{
+		
+	}
+}
+
+
+component System 
 {
 	provides IController iController;
 	
@@ -252,15 +291,21 @@ component System //I cant
 		LCD lcd;
 		Head head;
 		FloorPicker floorpicker;
+		TapePusher tapepusher;
+		TapeColorSensor tapecolorsensor;
+		DiskSensor disksensor;
 		
 		iController<=>controller.iController;
-		controller.iDiskSensor<=>head.iDiskSensor;
-		controller.iTapeColorSensor<=>head.iTapeColorSensor;
-		controller.iTapePusher<=>head.iTapePusher;
+		controller.iHead <=> head.iHead;
 		controller.iLCD<=>lcd.iLCD;
 		controller.itape<=>tape.iTape;
 		controller.iFloorPusher<=>floorpicker.iFloorPusher;
 		controller.iFloorSensor<=>floorpicker.iFloorSensor;
+		head.iController<=>controller.iController;
+		head.iDiskSensor <=> disksensor.iDiskSensor;
+		head.iTape <=> tape.iTape;
+		head.iTapePusher <=> tapepusher.iTapePusher;
+		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
 	}	
 	}
 
