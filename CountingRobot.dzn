@@ -107,7 +107,7 @@ interface ILCD //LCD screen
   	on showValue: state = State.single_state;
   }
 }
-
+/* 
 interface IFloorPicker //component that picks from factory floor
 {
 	in void pushBlack(); //push the first black disk you come by
@@ -125,6 +125,41 @@ interface IFloorPicker //component that picks from factory floor
 			}
 	}
 }
+* 
+*/
+interface IFloorSensor
+{
+	in void diskSensed();
+	out void diskColor();
+	behaviour
+	{
+	enum State {noDisk, diskPresent};
+	State state = State.noDisk;
+	on diskSensed(): state = State.diskPresent;
+	[state.diskPresent]
+	{
+		diskColor; //check the color when disk is present
+	}
+	}
+}
+
+interface IFloorPusher
+{
+	in void push();
+	out void completedPushProcedure();
+	behaviour 
+	{
+		enum State {letPass, pushProcedure};
+		State state = State.letPass;
+		on push: state = State.pushProcedure;
+		[state.pushProcedure] 
+		{
+			on completedPushProcedure: state = State.letPass;
+		}
+	}
+}
+
+
 component FloorPicker
 {
 	provides Communication Communication_provided;
