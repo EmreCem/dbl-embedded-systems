@@ -4,7 +4,7 @@
 #include <sstream>
 
 ConsoleLogger logger{};
-Client client("robot", "test.mosquitto.org", 1883, &logger);
+Client client("robot", "86.91.204.180", 1883, &logger);
 
 void checkHeartbeats() {
     if (client.heartbeat1LastReceived != 0 && millis() - client.heartbeat1LastReceived > 60000) {
@@ -64,7 +64,7 @@ int main() {
             }
         }
 
-        if (millis() - timeNow > 5000) {
+        if (millis() - timeNow > 5000) { // according to the protocol send a heartbeat every 5s
             client.publish_message(std::string("heartbeat") + robotId);
             timeNow = millis();
         }
