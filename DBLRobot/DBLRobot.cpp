@@ -28,6 +28,16 @@ std::string DiskBinary(int Num) // Returns string with disk colors needed to mak
     return DiskString;
 }
 
+int MoveRight(int CurrRampPos) { // Moves the tape right
+    std::cout << "Shifted right!\n\t";
+    return CurrRampPos - 1;
+}
+
+int MoveLeft(int CurrRampPos) { // Moves the tape left
+    std::cout << "Shifted left!\n\t";
+    return CurrRampPos + 1;
+}
+
 int main() {
     int Num = 0;
     std::string DiskString;
@@ -40,21 +50,22 @@ int main() {
     while (Num <= 7) {
         DiskString = DiskBinary(Num); // Needed disks
         length = DiskString.length(); // Number of spaces needed on tape
-        std::cout << "Number to form: " << Num << "\n\t" << "Needed Disks: " << DiskString << "\n\t";
+        std::cout << "\nNumber to form: " << Num << "\n\t";
         while (!DiskString.empty()) { // Keep collecting disks until all needed disks are aquired
+            std::cout << "Needed Disks: " << DiskString << "\n\t";
             NeededPos = 4 + DiskString.length() - length; // Needed pos for current disk
             std::cout << "Needed position: " << NeededPos << "\n\t";
-            std::cout << "RampPos: " << RampPos << '\n\t';
+            std::cout << "RampPos: " << RampPos << "\n\t";
             while (RampPos != NeededPos){ // Shift right position under the ramp
                 if (NeededPos > RampPos) {
                     // Shift conveyor left
-                    RampPos++;
+                    RampPos = MoveLeft(RampPos);
                 }
                 else {
                     // Shift conveyor right
-                    RampPos--;
+                    RampPos = MoveRight(RampPos);
                 }
-                std::cout << "RampPos: " << RampPos << '\n\t';
+                std::cout << "RampPos: " << RampPos << "\n\t";
             }
 
             NeededDisk = DiskString.back(); // Disk needed to form binary number
@@ -63,7 +74,7 @@ int main() {
             // Check for Needed Disk on conveyor belt
             std::cout << "Disk found!\n\t";
             // If found push on tape
-            std::cout << "Disk pushed!\n\n";
+            std::cout << "Disk pushed!\n\n\t";
             
             // Save value in currDisk at currPos
             
@@ -73,9 +84,11 @@ int main() {
         // Pusher is between the ramp and the sensor
         // Shift right to push the most left disk off
         RampPos--;
+        std::cout << "Shifted right!\n\t";
         while (RampPos != 4) {
             // Push disk off tape and move left
-            RampPos++;
+            std::cout << "Disk Removed!\n\t";
+            RampPos = MoveLeft(RampPos);
         }
         Num++;
     }
