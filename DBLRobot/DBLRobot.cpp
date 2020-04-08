@@ -38,13 +38,14 @@ int main() {
     int SensorPos = 6; // The current position under the rgb sensor on the tape. 
     int length; // number of spaces needed to form number
     while (Num <= 7) {
-        DiskString = DiskBinary(Num);
-        length = DiskString.length();
-        std::cout << Num << "\t" << DiskString << "\n";
-        while (!DiskString.empty()) {
-            NeededPos = 4 + DiskString.length() - length;
+        DiskString = DiskBinary(Num); // Needed disks
+        length = DiskString.length(); // Number of spaces needed on tape
+        std::cout << "Number to form: " << Num << "\n\t" << "Needed Disks: " << DiskString << "\n\t";
+        while (!DiskString.empty()) { // Keep collecting disks until all needed disks are aquired
+            NeededPos = 4 + DiskString.length() - length; // Needed pos for current disk
+            std::cout << "Needed position: " << NeededPos << "\n\t";
+            std::cout << "RampPos: " << RampPos << '\n\t';
             while (RampPos != NeededPos){ // Shift right position under the ramp
-                std::cout << "RampPos:\t" << RampPos << '\n';
                 if (NeededPos > RampPos) {
                     // Shift conveyor left
                     RampPos++;
@@ -53,21 +54,29 @@ int main() {
                     // Shift conveyor right
                     RampPos--;
                 }
+                std::cout << "RampPos: " << RampPos << '\n\t';
             }
-            // Check if currPos is correct
-            // If not shift to right position
+
             NeededDisk = DiskString.back(); // Disk needed to form binary number
-            std::cout << "\t" << NeededDisk << "\n";
+            std::cout << "Needed disk: " << NeededDisk << "\n\t";
 
             // Check for Needed Disk on conveyor belt
-            
+            std::cout << "Disk found!\n\t";
             // If found push on tape
+            std::cout << "Disk pushed!\n\n";
             
             // Save value in currDisk at currPos
             
             DiskString.pop_back(); // Remove found disk from DiskString
         }
-        // while 
+        // Start to remove disks from conveyor belt
+        // Pusher is between the ramp and the sensor
+        // Shift right to push the most left disk off
+        RampPos--;
+        while (RampPos != 4) {
+            // Push disk off tape and move left
+            RampPos++;
+        }
         Num++;
     }
 
