@@ -147,19 +147,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Client.cpp" />
-    <ClCompile Include="ClientMain.cpp" />
     <ClCompile Include="DBLRobot.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Client.h" />
     <ClInclude Include="ConsoleLogger.h" />
     <ClInclude Include="Date.h" />
     <ClInclude Include="DisplayLogger.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="ILogger.h" />
-    <ClInclude Include="MotorController.h" />
-    <ClInclude Include="SensorReader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
