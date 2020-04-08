@@ -33,19 +33,41 @@ int main() {
     std::string DiskString;
     char CurrDisks[7];
     char NeededDisk;
+    int NeededPos; // Position at which the disk needs to be placed
     int RampPos = 4; // The current position under the ramp on the tape
     int SensorPos = 6; // The current position under the rgb sensor on the tape. 
+    int length; // number of spaces needed to form number
     while (Num <= 7) {
         DiskString = DiskBinary(Num);
+        length = DiskString.length();
         std::cout << Num << "\t" << DiskString << "\n";
         while (!DiskString.empty()) {
+            NeededPos = 4 + DiskString.length() - length;
+            while (RampPos != NeededPos){ // Shift right position under the ramp
+                std::cout << "RampPos:\t" << RampPos << '\n';
+                if (NeededPos > RampPos) {
+                    // Shift conveyor left
+                    RampPos++;
+                }
+                else {
+                    // Shift conveyor right
+                    RampPos--;
+                }
+            }
+            // Check if currPos is correct
+            // If not shift to right position
             NeededDisk = DiskString.back(); // Disk needed to form binary number
-            // Check for Needed Disk on conveyor belt
-            // If found push on tape
-            // Save value in currDisk at currPos - 
             std::cout << "\t" << NeededDisk << "\n";
-            DiskString.pop_back(); // Remove found disk from string
+
+            // Check for Needed Disk on conveyor belt
+            
+            // If found push on tape
+            
+            // Save value in currDisk at currPos
+            
+            DiskString.pop_back(); // Remove found disk from DiskString
         }
+        // while 
         Num++;
     }
 
