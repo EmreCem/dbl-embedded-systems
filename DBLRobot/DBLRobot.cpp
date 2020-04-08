@@ -29,13 +29,82 @@ std::string DiskBinary(int Num) // Returns string with disk colors needed to mak
 }
 
 int MoveRight(int CurrRampPos) { // Moves the tape right
+    //Sense whether on border
+    //On border
+        // Move till belt
+        // Move till next border
+    //Not on border
+        // Move till border
+        // Move till belt
+        // Move till next border
     std::cout << "Shifted right!\n\t";
     return CurrRampPos - 1;
 }
 
 int MoveLeft(int CurrRampPos) { // Moves the tape left
+    //Sense whether on border
+    //On border
+        // Move till belt
+        // Move till next border
+    //Not on border
+        // Move till border
+        // Move till belt
+        // Move till next border
     std::cout << "Shifted left!\n\t";
     return CurrRampPos + 1;
+}
+
+void PushTape() {
+    std::cout << "Disk removed!\n\t";
+}
+
+void PushBelt() {
+    std::cout << "Disk pushed!\n\t";
+}
+
+bool SenseBelt() { // Check if there is a disk on the belt
+    //sense for disk
+    // if found
+    std::cout << "Disk sensed on belt!\n\"t";
+    return true;
+    // else return false
+}
+
+bool CheckWhite() {
+    // Check if color is white
+    // if white
+    std::cout << "White disk found!\n\t";
+    return true;
+    // else return false
+}
+
+bool CheckBlack() {
+    // Check if color is black
+    // if black
+    std::cout << "Black disk found!\n\t";
+    return true;
+    // else return false
+}
+
+void FindDisk(char Disk) {
+    bool found = false;
+    if (Disk == 'b') {
+        while (!found) {
+            while (!SenseBelt) {}
+            found = CheckBlack();
+        }
+        // push if black
+        PushBelt();
+    }
+
+    if (Disk == 'w') {
+        while (!found) {
+            while (!SenseBelt) {}
+            found = CheckWhite();
+        }
+        // push if black
+        PushBelt();
+    }
 }
 
 int main() {
@@ -72,9 +141,7 @@ int main() {
             std::cout << "Needed disk: " << NeededDisk << "\n\t";
 
             // Check for Needed Disk on conveyor belt
-            std::cout << "Disk found!\n\t";
-            // If found push on tape
-            std::cout << "Disk pushed!\n\n\t";
+            FindDisk(NeededDisk);
             
             // Save value in currDisk at currPos
             
@@ -87,7 +154,7 @@ int main() {
         std::cout << "Shifted right!\n\t";
         while (RampPos != 4) {
             // Push disk off tape and move left
-            std::cout << "Disk Removed!\n\t";
+            PushTape();
             RampPos = MoveLeft(RampPos);
         }
         Num++;
