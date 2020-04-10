@@ -155,6 +155,9 @@
     <ClInclude Include="DisplayLogger.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="ILogger.h" />
+    <ClInclude Include="MotorController.h" />
+    <ClInclude Include="SensorReader.h" />
+    <ClInclude Include="wiringPi.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

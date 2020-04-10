@@ -1,12 +1,16 @@
 // DBLRobot.cpp : This file contains the 'main' function. Program execution begins and ends there.
 
+#include <chrono>
+#include <thread>
 #include <iostream>
 #include "ILogger.h"
 #include "ConsoleLogger.h"
-//#include "MotorController.h"
-//#include "SensorReader.h"
+#include "MotorController.h"
+#include "SensorReader.h"
 
 ConsoleLogger logger{};
+SensorReader sensor{};
+MotorController motor{};
 
 std::string DiskBinary(int Num) // Returns string with disk colors needed to make the number
 {
@@ -31,27 +35,41 @@ std::string DiskBinary(int Num) // Returns string with disk colors needed to mak
 }
 
 int MoveRight(int CurrRampPos) { // Moves the tape right
-    //Sense whether on border
-    //On border
-        // Move till belt
-        // Move till next border
-    //Not on border
-        // Move till border
-        // Move till belt
-        // Move till next border
+    // Always end on border, so first we are on border
+    logger.LogDebug("On border");
+    motor.MoveMotorClockwise(1, 2); //Fill in right pins
+    logger.LogDebug("Started moving Right");
+    while (sensor.ReadTapeRGBSensor() == 1) { // Check if the tape is on a border
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    logger.LogDebug("On slot");
+    while (sensor.ReadTapeRGBSensor() == 0) // Check if the tape is on a slot
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    logger.LogDebug("On border");
+    motor.StopMotor(1, 2);
+    logger.LogDebug("Stopped moving right");
     logger.LogDebug("Shifted Right!");
     return CurrRampPos - 1;
 }
 
 int MoveLeft(int CurrRampPos) { // Moves the tape left
-    //Sense whether on border
-    //On border
-        // Move till belt
-        // Move till next border
-    //Not on border
-        // Move till border
-        // Move till belt
-        // Move till next border
+    // Always end on border, so first we are on border
+    logger.LogDebug("On border");
+    motor.MoveMotorCounterClockwise(1, 2); //Fill in right pins
+    logger.LogDebug("Started moving Left");
+    while (sensor.ReadTapeRGBSensor() == 1) { // Check if the tape is on a border
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    logger.LogDebug("On slot");
+    while (sensor.ReadTapeRGBSensor() == 0) // Check if the tape is on a slot
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    logger.LogDebug("On border");
+    motor.StopMotor(1, 2);
+    logger.LogDebug("Stopped moving left");
     logger.LogDebug("Shifted left!");
     return CurrRampPos + 1;
 }

@@ -17,17 +17,18 @@ inline void SensorReader::Setup(std::vector<int> pins) {
 }
 
 inline int SensorReader::ReadTapeRGBSensor() {
-	return digitalRead();
+	//return digitalRead();
+	return rand() % 2;
 }
 
 inline int SensorReader::ReadFactoryRGBSensor() {
-	return digitalRead();
+	//return digitalRead();
 }
 
 inline bool SensorReader::ReadFactoryPresenceSensor() {
-	return digitalRead();
+	//return digitalRead();
 }
 
 inline bool SensorReader::ReadTapePresenceSensor() {
-	return digitalRead();
+	//return digitalRead();
 }
