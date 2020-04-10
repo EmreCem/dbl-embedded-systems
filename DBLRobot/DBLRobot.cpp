@@ -75,10 +75,18 @@ int MoveLeft(int CurrRampPos) { // Moves the tape left
 }
 
 void PushTape() {
+    logger.LogDebug("Start swinging");
+    motor.MoveMotorClockwise(1, 2); //Fill in right pins
+    std::this_thread::sleep_for(std::chrono::milliseconds(400)); // adjust time for full rotation
+    motor.StopMotor(1, 2);
     logger.LogDebug("Disk removed!");
 }
 
 void PushBelt() {
+    logger.LogDebug("Start swinging");
+    motor.MoveMotorClockwise(1, 2); //Fill in right pins
+    std::this_thread::sleep_for(std::chrono::milliseconds(400)); // adjust time for full rotation
+    motor.StopMotor(1, 2);
     logger.LogDebug("Disk pushed!");
 }
 
@@ -131,7 +139,9 @@ int main() {
             logger.LogDebug("Needed Disks: " + DiskString);
             NeededPos = 4 + DiskString.length() - length; // Needed pos for current disk
             logger.LogDebug("Needed position: " + std::to_string(NeededPos));
-            logger.LogDebug("RampPos: " + std::to_string(RampPos));
+            TempString = "RampPos: ";
+            TempString.append(std::to_string(RampPos));
+            logger.LogDebug(TempString);
             while (RampPos != NeededPos){ // Shift right position under the ramp
                 if (NeededPos > RampPos) {
                     // Shift conveyor left
@@ -141,13 +151,13 @@ int main() {
                     // Shift conveyor right
                     RampPos = MoveRight(RampPos);
                 }
-                TempString = "RampPos: " + std::to_string(RampPos) + '\0';
+                TempString = "RampPos: ";
+                TempString.append(std::to_string(RampPos));
                 logger.LogDebug(TempString); // TODO fix logging bug
             }
 
             NeededDisk = DiskString.back(); // Disk needed to form binary number
-            TempString = "Needed Disk: " + NeededDisk + '\0';
-            logger.LogDebug(TempString);
+            logger.LogDebug("Needed Disk: " + NeededDisk);
 
             // Check for Needed Disk on conveyor belt
             FindDisk(NeededDisk);
