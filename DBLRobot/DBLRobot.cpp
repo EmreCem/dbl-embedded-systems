@@ -59,11 +59,11 @@ int MoveLeft(int CurrRampPos) { // Moves the tape left
     logger.LogDebug("On border");
     motor.MoveMotorCounterClockwise(1, 2); //Fill in right pins
     logger.LogDebug("Started moving Left");
-    while (sensor.ReadTapeRGBSensor() == 1) { // Check if the tape is on a border
+    while (sensor.ReadTapeRGBSensor()) { // Check if the tape is on a border
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     logger.LogDebug("On slot");
-    while (sensor.ReadTapeRGBSensor() == 0) // Check if the tape is on a slot
+    while (!sensor.ReadTapeRGBSensor()) // Check if the tape is on a slot
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -82,54 +82,41 @@ void PushBelt() {
     logger.LogDebug("Disk pushed!");
 }
 
-bool SenseBelt() { // Check if there is a disk on the belt
-    //sense for disk
-    // if found
-    logger.LogDebug("Disk sensed on belt!\n\"t");
-    return true;
-    // else return false
-}
-
-bool CheckWhite() {
-    // Check if color is white
-    // if white
-    logger.LogDebug("White disk found!");
-    return true;
-    // else return false
-}
-
-bool CheckBlack() {
-    // Check if color is black
-    // if black
-    logger.LogDebug("Black disk found!");
-    return true;
-    // else return false
-}
-
 void FindDisk(char Disk) {
     bool found = false;
     if (Disk == 'b') {
         while (!found) {
-            while (!SenseBelt) {}
-            found = CheckBlack();
+            while (!sensor.ReadFactoryPresenceSensor()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            if (!sensor.ReadFactoryRGBSensor())
+            {
+                logger.LogDebug("Black disk found");
+                found = true;
+                PushBelt();
+            }
         }
-        // push if black
-        PushBelt();
     }
 
     if (Disk == 'w') {
         while (!found) {
-            while (!SenseBelt) {}
-            found = CheckWhite();
+            while (!sensor.ReadFactoryPresenceSensor()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            if (sensor.ReadFactoryRGBSensor())
+            {
+                logger.LogDebug("White disk found");
+                found = true;
+                PushBelt();
+            }
         }
-        // push if black
-        PushBelt();
     }
 }
 
 int main() {
     int Num = 0;
     std::string DiskString;
+    std::string TempString;
     char CurrDisks[7];
     char NeededDisk;
     int NeededPos; // Position at which the disk needs to be placed
@@ -139,7 +126,6 @@ int main() {
     while (Num <= 7) {
         DiskString = DiskBinary(Num); // Needed disks
         length = DiskString.length(); // Number of spaces needed on tape
-        std::cout << "\n";
         logger.LogDebug("Number to form: " + std::to_string(Num));
         while (!DiskString.empty()) { // Keep collecting disks until all needed disks are aquired
             logger.LogDebug("Needed Disks: " + DiskString);
@@ -155,11 +141,13 @@ int main() {
                     // Shift conveyor right
                     RampPos = MoveRight(RampPos);
                 }
-                logger.LogDebug("RampPos: " + std::to_string(RampPos));
+                TempString = "RampPos: " + std::to_string(RampPos) + '\0';
+                logger.LogDebug(TempString); // TODO fix logging bug
             }
 
             NeededDisk = DiskString.back(); // Disk needed to form binary number
-            logger.LogDebug("Needed Disk: " + std::to_string(NeededDisk));
+            TempString = "Needed Disk: " + NeededDisk + '\0';
+            logger.LogDebug(TempString);
 
             // Check for Needed Disk on conveyor belt
             FindDisk(NeededDisk);

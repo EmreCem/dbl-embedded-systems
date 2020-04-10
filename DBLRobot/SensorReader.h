@@ -23,10 +23,12 @@ inline int SensorReader::ReadTapeRGBSensor() {
 
 inline int SensorReader::ReadFactoryRGBSensor() {
 	//return digitalRead();
+	return rand() % 2;
 }
 
 inline bool SensorReader::ReadFactoryPresenceSensor() {
 	//return digitalRead();
+	return rand() % 2;
 }
 
 inline bool SensorReader::ReadTapePresenceSensor() {
