@@ -6,6 +6,8 @@
 //#include "MotorController.h"
 //#include "SensorReader.h"
 
+ConsoleLogger logger{};
+
 std::string DiskBinary(int Num) // Returns string with disk colors needed to make the number
 {
     std::string DiskString;
@@ -37,7 +39,7 @@ int MoveRight(int CurrRampPos) { // Moves the tape right
         // Move till border
         // Move till belt
         // Move till next border
-    std::cout << "Shifted right!\n\t";
+    logger.LogDebug("Shifted Right!");
     return CurrRampPos - 1;
 }
 
@@ -50,22 +52,22 @@ int MoveLeft(int CurrRampPos) { // Moves the tape left
         // Move till border
         // Move till belt
         // Move till next border
-    std::cout << "Shifted left!\n\t";
+    logger.LogDebug("Shifted left!");
     return CurrRampPos + 1;
 }
 
 void PushTape() {
-    std::cout << "Disk removed!\n\t";
+    logger.LogDebug("Disk removed!");
 }
 
 void PushBelt() {
-    std::cout << "Disk pushed!\n\t";
+    logger.LogDebug("Disk pushed!");
 }
 
 bool SenseBelt() { // Check if there is a disk on the belt
     //sense for disk
     // if found
-    std::cout << "Disk sensed on belt!\n\"t";
+    logger.LogDebug("Disk sensed on belt!\n\"t");
     return true;
     // else return false
 }
@@ -73,7 +75,7 @@ bool SenseBelt() { // Check if there is a disk on the belt
 bool CheckWhite() {
     // Check if color is white
     // if white
-    std::cout << "White disk found!\n\t";
+    logger.LogDebug("White disk found!");
     return true;
     // else return false
 }
@@ -81,7 +83,7 @@ bool CheckWhite() {
 bool CheckBlack() {
     // Check if color is black
     // if black
-    std::cout << "Black disk found!\n\t";
+    logger.LogDebug("Black disk found!");
     return true;
     // else return false
 }
@@ -119,12 +121,13 @@ int main() {
     while (Num <= 7) {
         DiskString = DiskBinary(Num); // Needed disks
         length = DiskString.length(); // Number of spaces needed on tape
-        std::cout << "\nNumber to form: " << Num << "\n\t";
+        std::cout << "\n";
+        logger.LogDebug("Number to form: " + std::to_string(Num));
         while (!DiskString.empty()) { // Keep collecting disks until all needed disks are aquired
-            std::cout << "Needed Disks: " << DiskString << "\n\t";
+            logger.LogDebug("Needed Disks: " + DiskString);
             NeededPos = 4 + DiskString.length() - length; // Needed pos for current disk
-            std::cout << "Needed position: " << NeededPos << "\n\t";
-            std::cout << "RampPos: " << RampPos << "\n\t";
+            logger.LogDebug("Needed position: " + std::to_string(NeededPos));
+            logger.LogDebug("RampPos: " + std::to_string(RampPos));
             while (RampPos != NeededPos){ // Shift right position under the ramp
                 if (NeededPos > RampPos) {
                     // Shift conveyor left
@@ -134,11 +137,11 @@ int main() {
                     // Shift conveyor right
                     RampPos = MoveRight(RampPos);
                 }
-                std::cout << "RampPos: " << RampPos << "\n\t";
+                logger.LogDebug("RampPos: " + std::to_string(RampPos));
             }
 
             NeededDisk = DiskString.back(); // Disk needed to form binary number
-            std::cout << "Needed disk: " << NeededDisk << "\n\t";
+            logger.LogDebug("Needed Disk: " + std::to_string(NeededDisk));
 
             // Check for Needed Disk on conveyor belt
             FindDisk(NeededDisk);
@@ -150,8 +153,7 @@ int main() {
         // Start to remove disks from conveyor belt
         // Pusher is between the ramp and the sensor
         // Shift right to push the most left disk off
-        RampPos--;
-        std::cout << "Shifted right!\n\t";
+        RampPos = MoveRight(RampPos);
         while (RampPos != 4) {
             // Push disk off tape and move left
             PushTape();
