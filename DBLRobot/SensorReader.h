@@ -4,10 +4,10 @@
 class SensorReader {
 public:
 	static void Setup(std::vector<int> pins);
-	static int ReadBeltRGBSensor();
+	static int ReadTapeRGBSensor();
 	static int ReadFactoryRGBSensor();
 	static bool ReadFactoryPresenceSensor();
-	static bool ReadBeltPresenceSensor();
+	static bool ReadTapePresenceSensor();
 };
 
 inline void SensorReader::Setup(std::vector<int> pins) {
@@ -16,7 +16,7 @@ inline void SensorReader::Setup(std::vector<int> pins) {
 	}
 }
 
-inline int SensorReader::ReadBeltRGBSensor() {
+inline int SensorReader::ReadTapeRGBSensor() {
 	return digitalRead();
 }
 
@@ -28,6 +28,6 @@ inline bool SensorReader::ReadFactoryPresenceSensor() {
 	return digitalRead();
 }
 
-inline bool SensorReader::ReadBeltPresenceSensor() {
+inline bool SensorReader::ReadTapePresenceSensor() {
 	return digitalRead();
 }
