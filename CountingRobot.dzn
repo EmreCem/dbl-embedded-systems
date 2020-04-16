@@ -447,11 +447,7 @@ component Controller   //keeps track of which number we're building, communicate
 						// gives the order to start building, clearing, incrementing (the checking of bits must still be implemented)
 {
 	provides IController iController;
-	requires ITape itape;
 	requires ILCD iLCD;
-	requires ITapePusher iTapePusher;
-	requires ITapeColorSensor iTapeColorSensor;
-	requires IDiskSensor iDiskSensor;
 	requires IFloorPicker iFloorPicker;
 	requires IHead iHead;
 	behaviour 
@@ -568,7 +564,7 @@ component FloorPicker
 	requires IFloorSensor iFloorSensor; // used to be provide
 	requires IFloorPusher iFloorPusher; // used to be provide, but i cant order the floorpusher to push if it is a provide relation
 	provides IFloorPicker iFloorPicker;
-	requires IHead iHead;
+	requires IController iController;
 	behaviour 
 	{
 		enum State {sensing, disk_found, paused};
@@ -592,7 +588,23 @@ component FloorPicker
 	
 }
 
+component FloorSensor
+{
+	provides IFloorSensor iFloorSensor;
+	behaviour
+	{
+		
+	}
+}
 
+component FloorPusher
+{
+	provides IFloorPusher iFloorPusher;
+	behaviour
+	{
+		
+	}
+}
 
 component LCD 
 {
@@ -645,17 +657,22 @@ component System
 		TapePusher tapepusher;
 		TapeColorSensor tapecolorsensor;
 		DiskSensor disksensor;
+		FloorPusher floorpusher;
+		FloorSensor floorsensor;
+		
 		
 		iController<=>controller.iController;
 		controller.iHead <=> head.iHead;
 		controller.iLCD<=>lcd.iLCD;
-		controller.itape<=>tape.iTape;
-		controller.iFloorPicker<=>floorpicker.iFloorPicker;
+		controller.iFloorPicker <=> floorpicker.iFloorPicker;
 		head.iController<=>controller.iController;
 		head.iDiskSensor <=> disksensor.iDiskSensor;
 		head.iTape <=> tape.iTape;
 		head.iTapePusher <=> tapepusher.iTapePusher;
 		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
+		floorpicker.iFloorPusher<=>floorpusher.iFloorPusher;
+		floorpicker.iFloorSensor<=>floorsensor.iFloorSensor;
+		floorpicker.iController<=>controller.iController;
 	}	
 }
 
