@@ -41,6 +41,7 @@ interface IHead  // gets required bit colours from controller, manages the tape 
 	out void tape_is_clear();
 	out void take_fromfloor();
 	out void tape_takefromfloor();
+	out void ready_to_update();
 
 	behaviour
 	{
@@ -108,6 +109,9 @@ interface IFloorPicker
 	in void pause();
 	in void resume();
 	in void take_from_floor();
+	out void taken_from_floor();
+	out void black_on_floor();
+	out void white_on_floor();
 	
 	behaviour
 	{
@@ -139,9 +143,9 @@ interface IController // interface of the controller, keeps track of what we're 
 	in void black_on_floor();
 	in void white_on_floor();
 	in void tape_take_in();
-	in void taken_from_floor();
+	//in void taken_from_floor();
 	
-	out void pick_from_floor();
+	//out void pick_from_floor();
 	
 	out void pause();
 	out void resume();
@@ -383,7 +387,7 @@ component Head // keeps track of individual bits
 	requires ITapePusher iTapePusher;
 	requires ITapeColorSensor iTapeColorSensor;
 	requires IDiskSensor iDiskSensor;
-	requires IController iController;
+	//requires IController iController;
 	requires ITape iTape;
 	behaviour 
 	{
@@ -421,7 +425,7 @@ component Head // keeps track of individual bits
 		 [state.busy_3]
 		 {
 		 	on iTape.positionIn(): iHead.tape_takefromfloor();
-		 	on iHead.next_bit(): {iController.update(); state = State.full;}
+		 	on iHead.next_bit(): {iHead.ready_to_update(); state = State.full;}
 		 }
 		 [state.full]
 		 {
@@ -463,8 +467,8 @@ component Controller   //keeps track of which number we're building, communicate
 		bool bit3w = false;
 		bool white_sensed = false;
 		
-		on iController.black_on_floor(): white_sensed = false;
-		on iController.white_on_floor(): white_sensed = true;
+		on iFloorPicker.black_on_floor(): white_sensed = false;
+		on iFloorPicker.white_on_floor(): white_sensed = true;
 				
 		on iController.wait_for_others(): {state = making.wait; iController.pause(); iFloorPicker.pause();}
 		
@@ -488,25 +492,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -521,26 +526,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
-			
+			on iHead.ready_to_update(): iHead.start_clearing();
 			on iHead.tape_is_clear():
 			{
 				state = making.two; iHead.start_building();
@@ -553,25 +558,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -585,25 +591,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -617,25 +624,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -649,25 +657,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -681,25 +690,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -713,25 +723,26 @@ component Controller   //keeps track of which number we're building, communicate
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
-					if (bit1w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit1w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iController.taken_from_floor(): iHead.next_bit();
+				on iFloorPicker.taken_from_floor(): iHead.next_bit();
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
-					if (bit2w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit2w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iController.taken_from_floor(): iHead.next_bit();
+		 		on iFloorPicker.taken_from_floor(): iHead.next_bit();
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
-					if (bit3w && white_sensed) {iController.pick_from_floor();}  // checks if the correct bit is coming
-		 			if (!bit3w && !white_sensed) {iController.pick_from_floor();} // orders to take it if correct	
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			on iController.update(): iHead.start_clearing();
+			on iHead.ready_to_update(): iHead.start_clearing();
 			
 			on iHead.tape_is_clear():
 			{
@@ -753,7 +764,7 @@ component FloorPicker
 	requires IFloorSensor iFloorSensor; // used to be provide
 	requires IFloorPusher iFloorPusher; // used to be provide, but i cant order the floorpusher to push if it is a provide relation
 	provides IFloorPicker iFloorPicker;
-	requires IController iController;
+	//requires IController iController;
 	behaviour 
 	{
 		enum State {sensing, disk_found, paused};
@@ -761,13 +772,13 @@ component FloorPicker
 		on iFloorPicker.pause(): state = State.paused;
 		[state.sensing]
 		{
-			on iFloorSensor.black_sensed(): {state = State.disk_found; iController.black_on_floor();}
-			on iFloorSensor.white_sensed(): {state = State.disk_found; iController.white_on_floor();}	 //have to give the command to push to the pusher, cant do that with a provide
+			on iFloorSensor.black_sensed(): {state = State.disk_found; iFloorPicker.black_on_floor();}
+			on iFloorSensor.white_sensed(): {state = State.disk_found; iFloorPicker.white_on_floor();}	 //have to give the command to push to the pusher, cant do that with a provide
 		}
 		[state.disk_found]
 		{
-			on iController.pick_from_floor():{iFloorPusher.push();}
-			on iFloorPusher.completedPushProcedure(): {iController.taken_from_floor();}
+			on iFloorPicker.take_from_floor():{iFloorPusher.push();}
+			on iFloorPusher.completedPushProcedure(): {iFloorPicker.taken_from_floor();}
 		}
 		[state.paused]
 		{
@@ -854,14 +865,14 @@ component System
 		controller.iHead <=> head.iHead;
 		controller.iLCD<=>lcd.iLCD;
 		controller.iFloorPicker <=> floorpicker.iFloorPicker;
-		head.iController<=>controller.iController;
+		//head.iController<=>controller.iController;
 		head.iDiskSensor <=> disksensor.iDiskSensor;
 		head.iTape <=> tape.iTape;
 		head.iTapePusher <=> tapepusher.iTapePusher;
 		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
 		floorpicker.iFloorPusher<=>floorpusher.iFloorPusher;
 		floorpicker.iFloorSensor<=>floorsensor.iFloorSensor;
-		floorpicker.iController<=>controller.iController;
+		//floorpicker.iController<=>controller.iController;
 	}	
 }
 
