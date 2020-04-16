@@ -1,4 +1,4 @@
-import bit_interfaces.dzn;
+//import bit_interfaces.dzn;
 
 interface Communication //used to be time, communication interface now. Because these will be functions of communication with mqtt
 {
@@ -23,24 +23,139 @@ interface Communication //used to be time, communication interface now. Because 
 	}
 }
 
-interface ITape //our tape of the Turing machine with 3 slots
+interface IHead  // gets required bit colours from controller, manages the tape part of the robot
 {
-	in void moveLeft(); //goes one bit position to left 
-	in void moveRight(); //goes one bit position to right
-	in void dontMove(); //do not move 
-	out void tapeStopped(); //belt is moving or stopped
-	out void positionIn(); //The tape is in position to intake bit;
-	out void positionOut(); //The tape is in position to output bit;
+	in void bit1_w();
+	in void bit1_b();
+	in void bit2_w();
+	in void bit2_b();
+	in void bit3_w();
+	in void bit3_b();
+	in void black_sensed();
+	in void white_sensed();
+	in void start_building();
+	in void disk_pushed();
+	in void start_clearing();
+	in void clear();
+	out void tape_is_clear();
+	out void take_fromfloor();
+
 	behaviour
 	{
-		enum State {moving, stopping};
-		State state = State.stopping;
-		on moveLeft: state = State.moving;
-  		on moveRight: state = State.moving;
-  		on dontMove: state = State.stopping;
+		enum State {building, waiting, clearing};
+		State state = State.waiting;
+		
+		[state.waiting]
+		{
+			on start_building: {state = State.building;}
+			on start_clearing: {state = State.clearing;}
+		}
+		[state.building]
+		{
+			on start_clearing: {state = State.clearing;}
+			on start_building: illegal;
+		}
+		[state.clearing]
+		{
+			on start_building: {state = State.building;}
+		}
 	}
-	
 }
+
+interface IFloorPusher  // pushed the current disk off the factory if it receives the push order
+{
+	in void push();
+	out void completedPushProcedure();
+	behaviour 
+	{
+		enum State {letPass, pushProcedure};
+		State state = State.letPass;
+		on push: {state = State.pushProcedure; completedPushProcedure;}
+		[state.pushProcedure] 
+		{
+			on inevitable: state = State.letPass;
+		}
+	}
+}
+
+interface IFloorSensor  // replacement for the floorsensor, outputs which colour disk it detects
+{
+	in void black_comes();
+	in void white_comes();
+	out void black_sensed();
+	out void white_sensed();
+	behaviour
+	{
+	enum State {black_next, white_next, noDisk};
+	State state = State.noDisk;
+	on black_comes: {state = State.black_next; black_sensed;} //outputs diskcolour when found, 
+	on white_comes: {state = State.white_next; white_sensed;}
+	[state.black_next]
+	{
+		on inevitable: state = State.noDisk; //after x time goes back to sensing
+	}
+	[state.white_next]
+	{
+		on inevitable: state = State.noDisk; //after x time goes back to sensing
+	}	
+	}
+}
+
+interface IFloorPicker
+{
+	in void pause();
+	in void resume();
+	behaviour
+	{
+		enum State {busy, paused};
+		State state = State.busy;
+		[state.busy]
+		{
+			on pause: state = State.paused;
+			on resume: illegal;
+		}
+		[state.paused]
+		{
+			on pause: illegal;
+			on resume: state = State.busy;
+		}
+	}
+}
+
+
+interface IController // interface of the controller, keeps track of what we're doing, 
+						//can handle errors (eventually)
+{
+	in void init();
+	out void increment();
+	out void error_solved();
+	in void update();
+	in void error();
+	in void wait_for_others();
+	in void continue();
+	out void pause();
+	out void resume();
+
+	behaviour
+	{
+		enum State {error, building, off};
+		State state = State.off;
+		
+		on init: state = State.building;
+		
+		[state.building]
+		{
+			on error: state = State.error;
+		}
+		[state.error]
+		{
+			on inevitable: state = State.building;
+		}
+		
+	}	
+}
+
+
 
 /* interface IHeadSensor //Sensor on Tape
  {
@@ -68,7 +183,7 @@ interface ITapeColorSensor //Sensor on Tape
   {
   	enum State {single_state};
   	State state = State.single_state;
-  	on colorSensed: state = State.single_state;
+  	on getColor: {state = State.single_state; colorSensed;}
   }
 } 
 
@@ -79,13 +194,14 @@ interface IDiskSensor
 	out void diskColor();
 	behaviour
 	{
-	enum State {noDisk, diskPresent};
-	State state = State.noDisk;
-	on diskSensed(): state = State.diskPresent;
-	[state.diskPresent]
-	{
-		diskColor; //check the color when disk is present
-	}
+		enum State {noDisk, diskPresent};
+		State state = State.noDisk;
+		on diskSensed: {state = State.diskPresent; diskColor;}
+		
+		[state.diskPresent]
+		{
+			on inevitable: state = State.noDisk;
+		}
 	}
 }
 
@@ -97,10 +213,10 @@ interface ITapePusher
 	{
 		enum State {waiting, pushing};
 		State state = State.waiting;
-		on push(): state = State.pushing;
+		on push: {state = State.pushing; pushComplete;}
 		[state.pushing]
 		{
-			on pushComplete(): state = State.waiting;
+			on inevitable: state = State.waiting;
 		}
 	}
 }
@@ -137,59 +253,119 @@ interface IFloorPicker //component that picks from factory floor
 }
 * 
 */
-interface IFloorSensor
+
+interface ITape //our tape of the Turing machine with 3 slots
 {
-	in void diskSensed();
-	out void diskColor();
+	in void moveto1(); //goes to bit1
+	in void moveto2(); //goes to bit2
+	in void moveto3(); //goes to bit3
+	in void movetoclear1(); // starts clearing procedure
+	in void movetoclear2();
+	in void movetoclear3();
+	in void dontmove(); //stops tape
+	out void tapeStopped(); //belt is moving or stopped
+	out void positionIn(); //The tape is in position to intake bit;
+	out void positionOut(); //The tape is in position to output bit;
 	behaviour
 	{
-	enum State {noDisk, diskPresent};
-	State state = State.noDisk;
-	on diskSensed(): state = State.diskPresent;
-	[state.diskPresent]
-	{
-		diskColor; //check the color when disk is present
-	}
-	}
-}
-
-interface IHead
-{
-	in void goPos1();
-	behaviour
-	{
-		
-	}
-}
-
-interface IFloorPusher
-{
-	in void push();
-	out void completedPushProcedure();
-	behaviour 
-	{
-		enum State {letPass, pushProcedure};
-		State state = State.letPass;
-		on push: state = State.pushProcedure;
-		[state.pushProcedure] 
-		{
-			on completedPushProcedure: state = State.letPass;
-		}
-	}
-}
-
-component FloorPicker
-{
-	provides IFloorSensor iFloorSensor;
-	provides IFloorPusher iFloorPusher;
-	behaviour 
-	{
-		
+		enum State {moving, stopping, intake, output};
+		State state = State.stopping;
+		on moveto1: {state = State.moving;}
+  		on moveto2: {state = State.moving;}
+  		on moveto3: {state = State.moving;}
+  		on movetoclear1: {state = State.moving;}
+  		on movetoclear2: {state = State.moving;}
+  		on movetoclear3: {state = State.moving;}
+  		on dontmove: state = State.stopping;
+  		
+  		[state.stopping]
+  		{
+  			on inevitable: tapeStopped;
+  		}
+  		[state.moving]
+  		{
+  			on inevitable: state = State.stopping;
+  		}
+  		//[state.intake]
+  		//{
+  		//	on inevitable: positionIn();
+  		//}
+  		//[state.output]
+  		//{
+  		//	on inevitable: positionOut();
+  		//}
 	}
 	
 }
 
-component Head
+component Tape //keeps track of the position of the tape
+{
+	provides ITape iTape;
+	behaviour
+	{
+		enum position {bit1, bit2, bit3, bit1_clear, bit2_clear, bit3_clear, neutral};
+		position state = position.neutral;
+		
+		[state.neutral]
+		{
+			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
+			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
+			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
+			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+		}
+		[state.bit1]
+		{
+			on iTape.moveto1(): illegal;
+			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
+			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
+			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}
+		[state.bit2]
+		{
+			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
+			on iTape.moveto2(): illegal;
+			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
+			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}
+		[state.bit3]
+		{
+			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
+			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
+			on iTape.moveto3(): illegal;
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}		
+		[state.bit1_clear]
+		{
+			on iTape.movetoclear1(): illegal;
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}
+		[state.bit2_clear]
+		{
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): illegal;
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}
+		[state.bit3_clear]
+		{
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): illegal;
+		}
+	}
+		
+}
+
+
+
+component Head // keeps track of individual bits
 {
 	provides IHead iHead;
 	requires ITapePusher iTapePusher;
@@ -199,9 +375,224 @@ component Head
 	requires ITape iTape;
 	behaviour 
 	{
-		
+		 enum State {waiting, busy_1, busy_2, busy_3, full, clear_1, clear_2, clear_3};
+		 State state = State.waiting;
+		 bool bit1w = false;
+		 bool bit2w = false;
+		 bool bit3w = false;
+		 bool white_sensed = false;
+		 
+		 on iHead.bit1_w(): bit1w = true; //all this stuff is to convert the inputs from iHead to bools, bc the if-statement cant handle anything other than bools
+		 on iHead.bit1_b(): bit1w = false;
+		 on iHead.bit2_w(): bit1w = true;
+		 on iHead.bit2_b(): bit1w = false;
+		 on iHead.bit3_w(): bit1w = true;
+		 on iHead.bit3_b(): bit1w = false;
+		 on iHead.black_sensed(): white_sensed = false;
+		 on iHead.white_sensed(): white_sensed = true;
+		 
+		 [state.waiting]
+		 
+		 {
+		 	on iHead.start_building(): {state = State.busy_1; iTape.moveto1();} // moves tape to the bit1 intake slot 
+		 }
+		 [state.busy_1]
+		 {
+		 	on iTape.positionIn(): {
+		 		if (bit1w && white_sensed) {iHead.take_fromfloor();}  // checks if the correct bit is coming
+		 		if (!bit1w && !white_sensed) {iHead.take_fromfloor();} // orders to take it if correct
+		 		}
+		 	on iHead.disk_pushed(): {state = State.busy_2; iTape.moveto2();}  // waits until one is pushed in and moves to slot 2
+		 }
+		 [state.busy_2]
+		 {
+		 	on iTape.positionIn():{
+		 		if (bit2w && white_sensed){iHead.take_fromfloor();}
+		 		if (!bit1w && !white_sensed){iHead.take_fromfloor();}
+		 		}
+		 	on iHead.disk_pushed(): {state = State.busy_3; iTape.moveto3();}
+		 }
+		 [state.busy_3]
+		 {
+		 	on iTape.positionIn(): {
+		 		if (bit3w && white_sensed){iHead.take_fromfloor();}
+		 		if (!bit1w && !white_sensed){iHead.take_fromfloor();}
+		 		}
+		 	on iHead.disk_pushed(): {iController.update(); state = State.full;}
+		 }
+		 [state.full]
+		 {
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();}  // intermediate state when all bits are filled
+		 }
+		 [state.clear_1]
+		 {
+		 	on iTape.positionOut(): {iTapePusher.push();}
+		 	on iTapePusher.pushComplete(): {state = State.clear_2; iTape.movetoclear2();}  // clearing procedure
+		 }
+		 [state.clear_2]
+		 {
+		 	on iTape.positionOut(): {iTapePusher.push();}
+		 	on iTapePusher.pushComplete(): {state = State.clear_3; iTape.movetoclear3();}	
+		 }
+		 [state.clear_3]
+		 {
+		 	on iTape.positionOut(): {iTapePusher.push();}
+		 	on iTapePusher.pushComplete(): {state = State.waiting; iTape.dontmove(); iHead.tape_is_clear();}
+		 }		 		 
 	}
 }
+
+
+component Controller   //keeps track of which number we're building, communicates required bitcolours
+						// gives the order to start building, clearing, incrementing (the checking of bits must still be implemented)
+{
+	provides IController iController;
+	requires ITape itape;
+	requires ILCD iLCD;
+	requires ITapePusher iTapePusher;
+	requires ITapeColorSensor iTapeColorSensor;
+	requires IDiskSensor iDiskSensor;
+	requires IFloorPicker iFloorPicker;
+	requires IHead iHead;
+	behaviour 
+	{
+		enum making {empty, zero, one, two, three, four, five, six, seven, error, wait};
+		making state = making.empty;
+		on iController.wait_for_others(): {state = making.wait; iController.pause(); iFloorPicker.pause();}
+		[state.wait]
+		{
+			on iController.continue(): {iController.resume(); state = making.empty; iFloorPicker.resume();} // pause to wait for other robots to catch up, dont know how to actually pause the current action yet
+		}
+		[state.empty]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): 
+			{
+				state = making.zero; 
+				iHead.start_building();
+				iHead.bit1_b(); iHead.bit2_b(); iHead.bit3_b(); //bitcolours required for "0"
+			}
+		}
+		[state.zero]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.one; iHead.start_building();
+				iHead.bit1_b(); iHead.bit2_b(); iHead.bit3_w();
+			}
+			
+		}
+		[state.one]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.two; iHead.start_building();
+				iHead.bit1_b(); iHead.bit2_w(); iHead.bit3_b();
+			}
+		}
+		[state.two]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.three; iHead.start_building();
+				iHead.bit1_b(); iHead.bit2_w(); iHead.bit3_w();
+			}
+		}
+		[state.three]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.four; iHead.start_building();
+				iHead.bit1_w(); iHead.bit2_b(); iHead.bit3_b();
+			}
+		}	
+		[state.four]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.five; iHead.start_building();
+				iHead.bit1_w(); iHead.bit2_b(); iHead.bit3_w();
+			}
+		}	
+		[state.five]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.six; iHead.start_building();
+				iHead.bit1_w(); iHead.bit2_w(); iHead.bit3_b();
+			}
+		}
+		[state.six]
+		{
+			on iController.error(): {state = making.error;iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.seven; iHead.start_building();
+				iHead.bit1_w(); iHead.bit2_w(); iHead.bit3_w();
+			}
+		}
+		[state.seven]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.update(): iHead.start_clearing();
+			on iHead.tape_is_clear():
+			{
+				state = making.zero; iHead.start_building();
+				iHead.bit1_b(); iHead.bit2_b(); iHead.bit3_b();
+			}
+		}
+		[state.error]
+		{
+			//on inevitable: {iHead.start_clearing();}
+			on iHead.tape_is_clear(): {iController.error_solved(); state = making.zero;}
+		}
+	}
+}
+
+
+component FloorPicker
+{
+	requires IFloorSensor iFloorSensor; // used to be provide
+	requires IFloorPusher iFloorPusher; // used to be provide, but i cant order the floorpusher to push if it is a provide relation
+	provides IFloorPicker iFloorPicker;
+	requires IHead iHead;
+	behaviour 
+	{
+		enum State {sensing, disk_found, paused};
+		State state = State.sensing;
+		on iFloorPicker.pause(): state = State.paused;
+		[state.sensing]
+		{
+			on iFloorSensor.black_sensed(): {state = State.disk_found; iHead.black_sensed();}
+			on iFloorSensor.white_sensed(): {state = State.disk_found; iHead.white_sensed();}	 //have to give the command to push to the pusher, cant do that with a provide
+		}
+		[state.disk_found]
+		{
+			on iHead.take_fromfloor():{iFloorPusher.push();}
+			on iFloorPusher.completedPushProcedure(): {iHead.disk_pushed();}
+		}
+		[state.paused]
+		{
+			on iFloorPicker.resume(): state = State.sensing;
+		}
+	}
+	
+}
+
+
 
 component LCD 
 {
@@ -211,49 +602,9 @@ component LCD
 	}
 }
 
-component Tape 
-{
-	provides ITape iTape;
-	behaviour
-	{
-	}
-		
-}
 
-interface IController
-{
-	in void init();
-	out void increment();
-	in void update();
-	in void error();
-	// bits need white or black 
-	// and can be filled or empty
-	behaviour{
-	enum bit_state {white, black, none};
-	bit_state bit_1;
-	bit_state bit_2;
-	bit_state bit_3;
-	}	
-}
 
-component Controller 
-{
-	provides IController iController;
-	requires ITape itape;
-	requires ILCD iLCD;
-	requires ITapePusher iTapePusher;
-	requires ITapeColorSensor iTapeColorSensor;
-	requires IDiskSensor iDiskSensor;
-	requires IFloorSensor iFloorSensor;
-	requires IFloorPusher iFloorPusher;
-	requires IHead iHead;
-	behaviour 
-	{
-		
-	}
-}
-
-component TapePusher
+component TapePusher  // all functionality is in the interface already,  not sure if still needed
 {
 	provides ITapePusher iTapePusher;
 	behaviour
@@ -261,7 +612,7 @@ component TapePusher
 		
 	}
 }
-component TapeColorSensor
+component TapeColorSensor //must still be implemented
 {
 	provides ITapeColorSensor iTapeColorSensor;
 	behaviour
@@ -270,7 +621,7 @@ component TapeColorSensor
 	}
 }
 
-component DiskSensor
+component DiskSensor // must still be implemented
 {
 	provides IDiskSensor iDiskSensor;
 	behaviour
@@ -299,15 +650,14 @@ component System
 		controller.iHead <=> head.iHead;
 		controller.iLCD<=>lcd.iLCD;
 		controller.itape<=>tape.iTape;
-		controller.iFloorPusher<=>floorpicker.iFloorPusher;
-		controller.iFloorSensor<=>floorpicker.iFloorSensor;
+		controller.iFloorPicker<=>floorpicker.iFloorPicker;
 		head.iController<=>controller.iController;
 		head.iDiskSensor <=> disksensor.iDiskSensor;
 		head.iTape <=> tape.iTape;
 		head.iTapePusher <=> tapepusher.iTapePusher;
 		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
 	}	
-	}
+}
 
 
 
