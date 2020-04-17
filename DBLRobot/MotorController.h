@@ -1,5 +1,5 @@
 #pragma once
-#include <wiringPi.h>
+#include "wiringPi.h"
 #include <vector>
 
 class MotorController {
@@ -19,16 +19,16 @@ inline void MotorController::Setup(std::vector<int> pins) {
 }
 
 inline void MotorController::MoveMotorClockwise(int leftPin, int rightPin) {
-	digitalWrite(leftPin, 1);
-	digitalWrite(rightPin, 0);
+	//digitalWrite(leftPin, 1);
+	//digitalWrite(rightPin, 0);
 }
 
 inline void MotorController::MoveMotorCounterClockwise(int leftPin, int rightPin) {
-	digitalWrite(leftPin, 0);
-	digitalWrite(rightPin, 1);
+	//digitalWrite(leftPin, 0);
+	//digitalWrite(rightPin, 1);
 }
 
 inline void MotorController::StopMotor(int leftPin, int rightPin) {
-	digitalWrite(leftPin, 0);
-	digitalWrite(rightPin, 0);
+	//digitalWrite(leftPin, 0);
+	//digitalWrite(rightPin, 0);
 }
