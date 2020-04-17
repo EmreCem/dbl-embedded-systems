@@ -297,25 +297,20 @@ interface ITape //our tape of the Turing machine with 3 slots
 	in void movetoclear2();
 	in void movetoclear3();
 	in void dontmove(); //stops tape
-	out void tapeStopped(); //belt is moving or stopped
+	//out void tapeStopped(); belt is moving or stopped
 	out void positionIn(); //The tape is in position to intake bit;
 	out void positionOut(); //The tape is in position to output bit;
 	behaviour
 	{
-		enum State {moving, stopping, intake, output};
+		enum State {moving, stopping};
 		State state = State.stopping;
-		on moveto1: {state = State.moving;}
-  		on moveto2: {state = State.moving;}
-  		on moveto3: {state = State.moving;}
-  		on movetoclear1: {state = State.moving;}
-  		on movetoclear2: {state = State.moving;}
-  		on movetoclear3: {state = State.moving;}
+		on moveto1: {positionIn; state = State.moving;}
+  		on moveto2: {positionIn; state = State.moving;}
+  		on moveto3: {positionIn; state = State.moving;}
+  		on movetoclear1: {positionOut; state = State.moving;}
+  		on movetoclear2: {positionOut; state = State.moving;}
+  		on movetoclear3: {positionOut; state = State.moving;}
   		on dontmove: state = State.stopping;
-  		
-  		[state.stopping]
-  		{
-  			on inevitable: tapeStopped;
-  		}
   		[state.moving]
   		{
   			on inevitable: state = State.stopping;
@@ -342,25 +337,26 @@ component Tape //keeps track of the position of the tape
 		
 		[state.neutral]
 		{
-			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
-			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
-			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
-			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
-			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
+			on iTape.movetoclear1(): {iTape.positionOut(); state = position.bit1_clear;}
+			on iTape.movetoclear2(): { iTape.positionOut(); state = position.bit2_clear;}
+			on iTape.movetoclear3(): { iTape.positionOut(); state = position.bit3_clear;}
 		}
 		[state.bit1]
 		{
-			on iTape.moveto1(): illegal;
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}//dezyne wanted
 			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
 			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
-			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
 			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
 			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
 		}
 		[state.bit2]
 		{
 			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
-			on iTape.moveto2(): illegal;
+			on iTape.moveto2(): {iTape.positionIn();state = position.bit2;} //dezyne wanted
 			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
 			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
 			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
@@ -370,29 +366,40 @@ component Tape //keeps track of the position of the tape
 		{
 			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
 			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
-			on iTape.moveto3(): illegal;
+			on iTape.moveto3(): {iTape.positionIn();state = position.bit3;} //Dezyne wanted
 			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
 			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
 			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
 		}		
 		[state.bit1_clear]
 		{
-			on iTape.movetoclear1(): illegal;
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();} //Dezyne wanted
 			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
 			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
+			
 		}
 		[state.bit2_clear]
 		{
 			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
-			on iTape.movetoclear2(): illegal;
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();} //Dezyne wanted
 			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
 		}
 		[state.bit3_clear]
 		{
 			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
 			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
-			on iTape.movetoclear3(): illegal;
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();} //Dezyne wanted
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
 		}
+		on iTape.dontmove():{}
 	}
 		
 }
@@ -858,12 +865,12 @@ component TapePusher  // all functionality is in the interface already,  not sur
 		[state.waiting]
 		{
 		on iTapePusher.push():{state = State.pushing;}
-		on iTapePusher.backToWaiting():{state = State.waiting;}
+		on iTapePusher.backToWaiting():{state = State.waiting;} //stay in same state
 		}
 		[state.pushing]
 		{
 		on iTapePusher.backToWaiting(): {iTapePusher.pushComplete(); state=State.waiting;}
-		on iTapePusher.push():{}
+		on iTapePusher.push():{} //dont do anything
 		}
 	}
 }
