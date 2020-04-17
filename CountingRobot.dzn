@@ -53,12 +53,12 @@ interface IHead  // gets required bit colours from controller, manages the tape 
 		{
 			on start_building: {state = State.building;}
 			on start_clearing: {state = State.clearing;}
-			on next_bit: {illegal;}
+			on next_bit: {}
 		}
 		[state.building]
 		{
 			on start_clearing: {state = State.clearing;}
-			on start_building: {}
+			on start_building: {illegal;}
 			on next_bit: {}
 		}
 		[state.clearing]
@@ -246,7 +246,7 @@ interface ITapePusher
 	{
 		enum State {waiting, pushing};
 		State state = State.waiting;
-		on push: {state = State.pushing;}
+		on push: {state = State.pushing; }
 		on backToWaiting: state = State.waiting;
 		[state.pushing]
 		{
@@ -436,40 +436,45 @@ component Head // keeps track of individual bits
 		 
 		 {
 		 	on iHead.start_building(): {state = State.busy_1; iTape.moveto1();} // moves tape to the bit1 intake slot 
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();}
+		 	on iHead.next_bit():{}
 		 }
 		 [state.busy_1]
 		 {
-		 	on iTape.positionIn(): iHead.tape_takefromfloor();
+		 	on iTape.positionIn(): {} //iHead.tape_takefromfloor(); Dezyne doesn't allow
 		 	on iHead.next_bit(): {state = State.busy_2; iTape.moveto2();}  // waits until one is pushed in and moves to slot 2
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();} 
 		 }
 		 [state.busy_2]
 		 {
-		 	on iTape.positionIn(): iHead.tape_takefromfloor();
+		 	on iTape.positionIn(): {}//iHead.tape_takefromfloor(); Dezyne doesn't allow 
 		 	on iHead.next_bit(): {state = State.busy_2; iTape.moveto2();}
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();} 
 		 }
 		 [state.busy_3]
 		 {
-		 	on iTape.positionIn(): iHead.tape_takefromfloor();
+		 	on iTape.positionIn():{}//iHead.tape_takefromfloor(); Dezyne doesn't allow 
 		 	on iHead.next_bit(): {iHead.ready_to_update(); state = State.full;}
-		 }
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();} 
+		 } 
 		 [state.full]
 		 {
 		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();}  // intermediate state when all bits are filled
 		 }
 		 [state.clear_1]
 		 {
-		 	on iTape.positionOut(): {iTapePusher.push();}
-		 	on iTapePusher.pushComplete(): {state = State.clear_2; iTape.movetoclear2();}  // clearing procedure
+		 	on iTape.positionOut(): {iTapePusher.push();  iTape.movetoclear2(); state = State.clear_2;}
+		 	//on iTapePusher.pushComplete(): {state = State.clear_2; iTape.movetoclear2();}   clearing procedure
 		 }
 		 [state.clear_2]
 		 {
-		 	on iTape.positionOut(): {iTapePusher.push();}
-		 	on iTapePusher.pushComplete(): {state = State.clear_3; iTape.movetoclear3();}	
+		 	on iTape.positionOut(): {iTapePusher.push(); iTape.movetoclear3(); state = State.clear_3;}
+		 	//on iTapePusher.pushComplete(): {state = State.clear_3; iTape.movetoclear3();}	
 		 }
 		 [state.clear_3]
 		 {
-		 	on iTape.positionOut(): {iTapePusher.push();}
-		 	on iTapePusher.pushComplete(): {state = State.waiting; iTape.dontmove(); iHead.tape_is_clear();}
+		 	on iTape.positionOut(): {iTapePusher.push(); state=State.waiting;}// iHead.tape_is_clear(); not allowed by Dezyne
+		 	//on iTapePusher.pushComplete(): {state = State.waiting; iTape.dontmove(); iHead.tape_is_clear();}
 		 }		 		 
 	}
 }
@@ -850,6 +855,10 @@ component LCD
 	provides ILCD iLCD;
 	behaviour
 	{	
+		enum State {single_state};
+		State state = State.single_state;
+		on iLCD.getValue():{}
+		on iLCD.showValue():{}
 	}
 }
 
