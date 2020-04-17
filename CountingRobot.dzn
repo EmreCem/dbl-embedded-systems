@@ -58,7 +58,7 @@ interface IHead  // gets required bit colours from controller, manages the tape 
 		[state.building]
 		{
 			on start_clearing: {state = State.clearing;}
-			on start_building: illegal;
+			on start_building: {}
 			on next_bit: {}
 		}
 		[state.clearing]
@@ -207,20 +207,20 @@ interface IController // interface of the controller, keeps track of what we're 
 }
 * 
 */
-interface ITapeColorSensor //Sensor on Tape
+interface ITapeColorSensor //color Sensor on Tape
 {
-	in void getColor();
-	out void colorSensed(); //empty, white or black
+	in void sense();
+	out void colorSensed();
   	behaviour
   {
   	enum State {single_state};
   	State state = State.single_state;
-  	on getColor: {state = State.single_state; colorSensed;}
+  	on sense: {state = State.single_state; colorSensed;}
   }
 } 
 
 
-interface IDiskSensor
+interface IDiskSensor //disk sensor on tape
 {
 	in void diskSensed();
 	out void diskColor();
@@ -240,15 +240,17 @@ interface IDiskSensor
 interface ITapePusher
 {
 	in void push();
+	in void backToWaiting();
 	out void pushComplete();
 	behaviour
 	{
 		enum State {waiting, pushing};
 		State state = State.waiting;
-		on push: {state = State.pushing; pushComplete;}
+		on push: {state = State.pushing;}
+		on backToWaiting: state = State.waiting;
 		[state.pushing]
 		{
-			on inevitable: state = State.waiting;
+			on backToWaiting: {state = State.waiting; pushComplete;}
 		}
 	}
 }
@@ -851,25 +853,41 @@ component TapePusher  // all functionality is in the interface already,  not sur
 	provides ITapePusher iTapePusher;
 	behaviour
 	{
-		
+		enum State {pushing, waiting};
+		State state = State.waiting;
+		[state.waiting]
+		{
+		on iTapePusher.push():{state = State.pushing;}
+		on iTapePusher.backToWaiting():{state = State.waiting;}
+		}
+		[state.pushing]
+		{
+		on iTapePusher.backToWaiting(): {iTapePusher.pushComplete(); state=State.waiting;}
+		on iTapePusher.push():{}
+		}
 	}
 }
+
 component TapeColorSensor //must still be implemented
 {
 	provides ITapeColorSensor iTapeColorSensor;
 	behaviour
 	{
-		
+		enum State {single_state}; //always senses
+		State state = State.single_state;
+		on iTapeColorSensor.sense():{iTapeColorSensor.colorSensed();} //sends back the color it sensed
 	}
 }
 
-component DiskSensor // must still be implemented
+component DiskSensor
 {
 	provides IDiskSensor iDiskSensor;
 	behaviour
 	{
-		
-	}
+		enum State {single_state}; //always senses
+		State state = State.single_state;
+		on iDiskSensor.diskSensed():{iDiskSensor.diskColor();} //Always sends the color of a disk when a disk is sensed
+		}
 }
 
 
