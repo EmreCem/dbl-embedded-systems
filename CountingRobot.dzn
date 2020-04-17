@@ -127,10 +127,11 @@ interface IFloorPicker
 		{
 			on pause: state = State.paused;
 			on resume: illegal;
+			on take_from_floor :illegal;
 		}
 		[state.paused]
 		{
-			on pause: illegal;
+			on pause: {}
 			on resume: state = State.busy;
 			on take_from_floor :illegal;
 		}
@@ -818,6 +819,7 @@ component FloorPicker
 		{
 			on iFloorSensor.black_sensed(): {state = State.disk_found; iFloorPicker.black_on_floor();}
 			on iFloorSensor.white_sensed(): {state = State.disk_found; iFloorPicker.white_on_floor();}	 //have to give the command to push to the pusher, cant do that with a provide
+			on iFloorPicker.take_from_floor():{} //Dezyne wanted this here
 		}
 		[state.disk_found]
 		{
@@ -837,7 +839,10 @@ component FloorSensor
 	provides IFloorSensor iFloorSensor;
 	behaviour
 	{
-		
+		enum State {single_state};
+		State state = State.single_state;
+		on iFloorSensor.black_comes(): iFloorSensor.black_sensed();
+		on iFloorSensor.white_comes(): iFloorSensor.white_sensed();
 	}
 }
 
@@ -846,7 +851,9 @@ component FloorPusher
 	provides IFloorPusher iFloorPusher;
 	behaviour
 	{
-		
+		enum State {single_state};
+		State state = State.single_state;
+		on iFloorPusher.push(): iFloorPusher.completedPushProcedure();
 	}
 }
 
