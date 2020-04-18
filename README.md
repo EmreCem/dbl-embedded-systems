@@ -1,17 +1,8 @@
-# power up motor with gpio
-
-```
-gpio -g mode <pin> pwm
-gpio -g pwm <pin> <0-1023>
-```
-
-e.g.
-
-```
-gpio -g mode 12 pwm
-gpio -g mode 19 pwm
-gpio -g pwm 12 1023
-gpio -g pwm 19 0
-```
-
-whereas 0 is strongest.
+# Counting Robot
+This is a Robot designed with Fishcher Technik, implemented on Raspberry Pi with C++.
+Verified with Dezyne.
+# Behavior
+The robot represents 3-bit values as white and black disks on a conveyor belt.
+The disks are picked from a factory floor thats shared with other robots.
+# Communication
+Robot communicates with other robots on the factory floor via mqtt with an agreed upon protocol.
