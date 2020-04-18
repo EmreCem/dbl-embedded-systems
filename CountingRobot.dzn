@@ -1,0 +1,1129 @@
+//interface Communication //used to be time, communication interface now. Because these will be functions of communication with mqtt
+//{
+//	in void error();
+//	in void tick();
+//	in void errorProcedure();
+	
+//	behaviour
+//	{
+//		enum State {heartbeat, error};
+//		State state = State.heartbeat;
+//		on error: state = State.error;
+//		[state.heartbeat]  
+//		{
+//			on tick:{}
+//			on errorProcedure: illegal;
+//		}        
+///		[state.error]
+///		{
+//			on errorProcedure:{state = State.heartbeat;}
+//			on tick: illegal;
+//		}
+//		
+//	}
+//}
+
+interface ITimer {
+	extern Long $long$;
+	
+	in void start(Long milliseconds);
+	in void cancel();
+	out void timeout();
+	
+	behaviour {
+		enum State { Idle, Running };
+		State state = State.Idle;
+		
+		[state.Idle] {
+			on start: state = State.Running;
+			on cancel: illegal;
+		}	
+		
+		[state.Running] {
+			on start: {}
+			on cancel: state = State.Idle;
+			on inevitable: {
+				state = State.Idle;
+				timeout;
+			}
+		}
+	}
+}
+
+interface IRobotCommunication {
+	
+	in void start();
+	in void stop();
+	in void emergencyStop();
+	out void emergency();
+	
+	out void requestDiskCounters();
+	in void respondDiskCounters();
+	
+	out void heartbeat();
+	in void heartbeat1();
+	in void heartbeat2();
+	in void heartbeat3();
+	in void heartbeat4();
+	
+	out void tookDisk_out();
+	in void tookDisk_in();
+	
+	in void controller_took_disk();	
+	in void controller_error();
+	in void controller_error_solved();
+	in void controller_emergency();
+	
+	out void error_out();
+	in void error_in();
+	
+	out void requestDisksTaken();
+	in void respondDisksTaken();
+	
+	behaviour {
+		enum State { Idle, Running, Error };
+		State state = State.Idle;
+		
+		on respondDiskCounters,
+		   respondDisksTaken,
+		   controller_took_disk,
+		   controller_error,
+		   controller_error_solved,
+		   controller_emergency,
+		   error_in,
+		   heartbeat1,
+		   heartbeat2,
+		   heartbeat3,
+		   heartbeat4,
+		   tookDisk_in: {}
+		
+		[state.Idle] {
+			on start: state = State.Running;
+			on stop: {}
+			on emergencyStop: {}
+			//all below required against verification error
+			on controller_emergency:{emergency;}
+			on controller_took_disk:illegal;
+			on controller_error_solved: {requestDisksTaken; state= State.Running;}
+			on respondDisksTaken:illegal;
+			on error_in:illegal;
+			on controller_error:{illegal;}
+			on tookDisk_in:illegal;
+			on heartbeat1:illegal;
+		   	on heartbeat2:illegal;
+		   	on heartbeat3:illegal;
+		   	on heartbeat4:illegal;
+		   	on respondDiskCounters:illegal;
+			on controller_took_disk:illegal;
+		}
+		
+		[state.Running] {
+			on stop: state = State.Idle;
+			on emergencyStop: state = State.Idle;
+			
+			on controller_emergency: {
+				state = State.Error;
+				emergency;
+			}
+			
+			on optional: {
+				requestDiskCounters;
+			}
+			
+			on controller_error_solved: {
+				requestDisksTaken;
+			}
+			
+			on controller_error: {
+				error_out;
+				state= State.Error;
+			}
+			
+			on controller_took_disk: {
+				tookDisk_out;
+			}
+			
+			on optional: {
+				heartbeat;
+			}
+			
+			on start: illegal;
+			}
+			//ADDED THIS BECAUSE ITS NEEDED.
+			[state.Error]
+			{
+				on emergencyStop: {}
+				on respondDisksTaken:illegal;
+				on error_in:illegal;
+				on controller_error:{illegal;}
+				on optional: {
+				heartbeat;
+				}
+				on tookDisk_in:illegal;
+		   		on respondDiskCounters:illegal;
+				on controller_took_disk:illegal;
+				on start:illegal;
+				on stop: illegal;
+				on controller_emergency:{emergency;}
+				on controller_error_solved: {
+				requestDisksTaken;
+				state = State.Running;
+			}
+			}
+		}
+	}
+
+component RobotCommunication 
+{
+	provides IRobotCommunication iCommunication;
+	requires ITimer iTimer;
+	//requires IController icontroller;
+	
+	behaviour
+	{
+		enum State {idle, running, error};
+		State state = State.idle;
+
+		enum R1 {dead, running, error, unconnected, awaiting_h}; R1 r1 = R1.unconnected;
+		enum R2 {dead, running, error, unconnected, awaiting_h}; R2 r2 = R2.unconnected;
+		enum R3 {dead, running, error, unconnected, awaiting_h}; R3 r3 = R3.unconnected;
+		enum R4 {dead, running, error, unconnected, awaiting_h}; R4 r4 = R4.unconnected;		
+		
+		[state.idle]
+		{
+			on 	iCommunication.controller_took_disk(),
+		   	   	iCommunication.controller_error(),
+		   		iCommunication.controller_error_solved(),
+		   		iCommunication.controller_emergency(),
+		   		iCommunication.error_in(),
+		   		iCommunication.respondDiskCounters(),
+				iTimer.timeout(),
+				iCommunication.tookDisk_in(),
+				iCommunication.respondDisksTaken(),
+				iCommunication.emergencyStop(),
+				iCommunication.heartbeat1(),
+				iCommunication.heartbeat2(),
+				iCommunication.heartbeat3(),
+				iCommunication.heartbeat4(),
+				iCommunication.stop():{}
+				
+			on iCommunication.start(): 
+			{
+				state = State.running;
+				iTimer.start($30$);
+				r1 = R1.unconnected; // initialized all robots as unconnected on startup
+				r2 = R2.unconnected;
+				r3 = R3.unconnected;
+				r4 = R4.unconnected;
+			}
+		}
+		[state.running]
+		{
+			on iCommunication.stop(): state = State.idle;
+			on iCommunication.emergencyStop(): state = State.idle;
+			
+			on iTimer.timeout():
+			{
+				iCommunication.heartbeat(); //sends heartbeat every 30 seconds
+				if(r1 == R1.running){r1 = R1.awaiting_h;} else {r1 = R1.dead;} //checks if robots are still on
+				if(r2 == R2.running){r2 = R2.awaiting_h;} else {r2 = R2.dead;} // in on we will set to wait for next heartbeat
+				if(r3 == R3.running){r3 = R3.awaiting_h;} else {r3 = R3.dead;} // if robots have not updated, we will assume dead
+				if(r4 == R4.running){r4 = R4.awaiting_h;} else {r4 = R4.dead;}
+				
+				iTimer.start($30$);
+			}
+			on iCommunication.heartbeat1(): r1 = R1.running;  // updates state of robots when receiving heartbeat
+			on iCommunication.heartbeat2(): r2 = R2.running;
+			on iCommunication.heartbeat3(): r3 = R3.running;
+			on iCommunication.heartbeat4(): r4 = R4.running;
+			on iCommunication.tookDisk_in():{}
+			on iCommunication.controller_error(): { state = State.error; iCommunication.error_out();}
+			on iCommunication.controller_emergency(): {iCommunication.emergency(); state = State.error; }
+			on iCommunication.respondDisksTaken():{}
+			on iCommunication.error_in():{}
+			on iCommunication.respondDiskCounters():{}
+			on iCommunication.controller_error_solved():{}
+			on iCommunication.controller_took_disk(): {state = State.running; iCommunication.tookDisk_out();}
+		}
+		[state.error]
+		{
+			on iTimer.timeout():
+			{
+				iCommunication.heartbeat(); //sends heartbeat every 30 seconds
+				if(r1 == R1.running){r1 = R1.awaiting_h;} else {r1 = R1.dead;} //checks if robots are still on
+				if(r2 == R2.running){r2 = R2.awaiting_h;} else {r2 = R2.dead;} // in on we will set to wait for next heartbeat
+				if(r3 == R3.running){r3 = R3.awaiting_h;} else {r3 = R3.dead;} // if robots have not updated, we will assume dead
+				if(r4 == R4.running){r4 = R4.awaiting_h;} else {r4 = R4.dead;}
+				
+				iTimer.start($30$);
+			}
+			on iCommunication.controller_error_solved(): {state = State.running; iCommunication.requestDisksTaken();}
+			on iCommunication.controller_emergency(): {state = State.error; iCommunication.emergency();}
+			on iCommunication.emergencyStop(): {}
+			on iCommunication.heartbeat1(): r1 = R1.running;  // updates state of robots when receiving heartbeat
+			on iCommunication.heartbeat2(): r2 = R2.running;
+			on iCommunication.heartbeat3(): r3 = R3.running;
+			on iCommunication.heartbeat4(): r4 = R4.running;
+		}
+	}
+}
+
+interface IHead  // gets required bit colours from controller, manages the tape part of the robot
+{
+
+	in void start_building();
+	in void next_bit();
+	in void start_clearing();
+	
+	out void tape_is_clear();
+	out void take_fromfloor();
+	out void tape_takefromfloor();
+	out void ready_to_update();
+
+	behaviour
+	{
+		enum State {building, waiting, clearing};
+		State state = State.waiting;
+		
+		[state.waiting]
+		{
+			on start_building: {state = State.building;}
+			on start_clearing: {state = State.clearing;}
+			on next_bit: {}
+		}
+		[state.building]
+		{
+			on start_clearing: {state = State.clearing;}
+			on start_building: {illegal;}
+			on next_bit: {}
+		}
+		[state.clearing]
+		{
+			on start_building: {state = State.building;}
+			on next_bit: {}
+			on start_clearing: {state = State.clearing;}
+		}
+	}
+}
+
+interface IFloorPusher  // pushed the current disk off the factory if it receives the push order
+{
+	in void push();
+	out void completedPushProcedure();
+	behaviour 
+	{
+		enum State {letPass, pushProcedure};
+		State state = State.letPass;
+		on push: {state = State.pushProcedure; completedPushProcedure;}
+		[state.pushProcedure] 
+		{
+			on inevitable: state = State.letPass;
+		}
+	}
+}
+
+interface IFloorSensor  // replacement for the floorsensor, outputs which colour disk it detects
+{
+	in void black_comes();
+	in void white_comes();
+	out void black_sensed();
+	out void white_sensed();
+	behaviour
+	{
+	enum State {black_next, white_next, noDisk};
+	State state = State.noDisk;
+	on black_comes: {state = State.black_next; black_sensed;} //outputs diskcolour when found, 
+	on white_comes: {state = State.white_next; white_sensed;}
+	[state.black_next]
+	{
+		on inevitable: state = State.noDisk; //after x time goes back to sensing
+	}
+	[state.white_next]
+	{
+		on inevitable: state = State.noDisk; //after x time goes back to sensing
+	}	
+	}
+}
+
+interface IFloorPicker
+{
+	in void pause();
+	in void resume();
+	in void take_from_floor();
+	out void taken_from_floor();
+	out void black_on_floor();
+	out void white_on_floor();
+	
+	behaviour
+	{
+		enum State {busy, paused};
+		State state = State.busy;
+		on take_from_floor:{}
+		[state.busy]
+		{
+			on pause: state = State.paused;
+			on resume: illegal;
+			on take_from_floor :illegal;
+		}
+		[state.paused]
+		{
+			on pause: {}
+			on resume: state = State.busy;
+			on take_from_floor :illegal;
+		}
+	}
+}
+
+
+interface IController // interface of the controller, keeps track of what we're doing, 
+						//can handle errors (eventually)
+{
+	in void init();
+	in void update();
+	in void error();
+	in void continue();
+	
+	out void pause();
+	out void resume();
+	out void increment();
+	//out void error_detected();
+	//out void error_solved();
+	out void took_disk();
+	out void emergency();
+
+	behaviour
+	{
+		enum State {error, building, off};
+		State state = State.off;
+		
+		[state.off]
+		{
+		on init: state = State.building;
+		on error: {illegal;}
+		on continue: illegal; 
+		on update: illegal;
+		}
+			
+		[state.building]
+		{
+			on error: state = State.error;
+			on update:{state = State.building;}
+			on continue:{state = State.building;}
+			on init: {illegal;}//dezyne wanted this here
+		}
+		[state.error]
+		{
+			on inevitable: state = State.building;
+			on continue: illegal;
+			on error: state = State.error;
+			on update: illegal;
+			on init: illegal;
+		}
+	}	
+}
+
+interface ITapeColorSensor //color Sensor on Tape
+{
+	in void sense();
+	out void colorSensed();
+  	behaviour
+  {
+  	enum State {single_state};
+  	State state = State.single_state;
+  	on sense: {state = State.single_state; colorSensed;}
+  }
+} 
+
+
+interface IDiskSensor //disk sensor on tape
+{
+	in void diskSensed();
+	out void diskColor();
+	behaviour
+	{
+		enum State {noDisk, diskPresent};
+		State state = State.noDisk;
+		on diskSensed: {state = State.diskPresent; diskColor;}
+		
+		[state.diskPresent]
+		{
+			on inevitable: state = State.noDisk;
+		}
+	}
+}
+
+interface ITapePusher
+{
+	in void push();
+	in void backToWaiting();
+	out void pushComplete();
+	behaviour
+	{
+		enum State {waiting, pushing};
+		State state = State.waiting;
+		on push: {state = State.pushing; }
+		on backToWaiting: state = State.waiting;
+		[state.pushing]
+		{
+			on backToWaiting: {state = State.waiting; pushComplete;}
+		}
+	}
+}
+
+interface ILCD //LCD screen
+{
+  	in void getValue();
+  	in void showValue();
+  	behaviour
+  {
+  	enum State {single_state};
+  	State state = State.single_state;
+  	on getValue: state = State.single_state;
+  	on showValue: state = State.single_state;
+  }
+}
+
+
+interface ITape //our tape of the Turing machine with 3 slots
+{
+	in void moveto1(); //goes to bit1
+	in void moveto2(); //goes to bit2
+	in void moveto3(); //goes to bit3
+	in void movetoclear1(); // starts clearing procedure
+	in void movetoclear2();
+	in void movetoclear3();
+	in void dontmove(); //stops tape
+	out void positionIn(); //The tape is in position to intake bit;
+	out void positionOut(); //The tape is in position to output bit;
+	behaviour
+	{
+		enum State {moving, stopping};
+		State state = State.stopping;
+		on moveto1: {positionIn; state = State.moving;}
+  		on moveto2: {positionIn; state = State.moving;}
+  		on moveto3: {positionIn; state = State.moving;}
+  		on movetoclear1: {positionOut; state = State.moving;}
+  		on movetoclear2: {positionOut; state = State.moving;}
+  		on movetoclear3: {positionOut; state = State.moving;}
+  		on dontmove: state = State.stopping;
+  		[state.moving]
+  		{
+  			on inevitable: state = State.stopping;
+  		}
+	}	
+}
+
+component Tape //keeps track of the position of the tape
+{
+	provides ITape iTape;
+	behaviour
+	{
+		enum position {bit1, bit2, bit3, bit1_clear, bit2_clear, bit3_clear, neutral};
+		position state = position.neutral;
+		
+		[state.neutral]
+		{
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
+			on iTape.movetoclear1(): {iTape.positionOut(); state = position.bit1_clear;}
+			on iTape.movetoclear2(): { iTape.positionOut(); state = position.bit2_clear;}
+			on iTape.movetoclear3(): { iTape.positionOut(); state = position.bit3_clear;}
+		}
+		[state.bit1]
+		{
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}//dezyne wanted
+			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
+			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}
+		[state.bit2]
+		{
+			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
+			on iTape.moveto2(): {iTape.positionIn();state = position.bit2;} //dezyne wanted
+			on iTape.moveto3(): {state = position.bit3;  iTape.positionIn();}
+			on iTape.movetoclear1(): {state = position.bit1_clear;iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}
+		[state.bit3]
+		{
+			on iTape.moveto1(): {state = position.bit1; iTape.positionIn();}
+			on iTape.moveto2(): {state = position.bit2;  iTape.positionIn();}
+			on iTape.moveto3(): {iTape.positionIn();state = position.bit3;} //Dezyne wanted
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+		}		
+		[state.bit1_clear]
+		{
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();} //Dezyne wanted
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
+			
+		}
+		[state.bit2_clear]
+		{
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();} //Dezyne wanted
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();}
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
+		}
+		[state.bit3_clear]
+		{
+			on iTape.movetoclear1(): {state = position.bit1_clear; iTape.positionOut();}
+			on iTape.movetoclear2(): {state = position.bit2_clear; iTape.positionOut();}
+			on iTape.movetoclear3(): {state = position.bit3_clear; iTape.positionOut();} //Dezyne wanted
+			on iTape.moveto1(): {iTape.positionIn(); state = position.bit1;}
+			on iTape.moveto2(): {iTape.positionIn(); state = position.bit2;}
+			on iTape.moveto3(): {iTape.positionIn(); state = position.bit3;}
+		}
+		on iTape.dontmove():{}
+	}
+		
+}
+
+
+
+component Head // Gives orders to position the tape for intake and output
+{
+	provides IHead iHead;
+	requires ITapePusher iTapePusher;
+	requires ITapeColorSensor iTapeColorSensor;
+	requires IDiskSensor iDiskSensor;
+	requires ITape iTape;
+	behaviour 
+	{
+		 enum State {waiting, busy_1, busy_2, busy_3, clear_1, clear_2, clear_3};
+		 State state = State.waiting;
+		 bool bit1w = false;
+		 bool bit2w = false;
+		 bool bit3w = false;
+		 bool white_sensed = false;
+		 
+		 [state.waiting]
+		 
+		 {
+		 	on iHead.start_building(): {state = State.busy_1; iTape.moveto1();} // moves tape to the bit1 intake slot 
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();}
+		 	on iHead.next_bit():{}
+		 }
+		 [state.busy_1]
+		 {
+		 	on iTape.positionIn(): {} //iHead.tape_takefromfloor(); Dezyne doesn't allow
+		 	on iHead.next_bit(): {state = State.busy_2; iTape.moveto2();}  // waits until one is pushed in and moves to slot 2
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();} 
+		 }
+		 [state.busy_2]
+		 {
+		 	on iTape.positionIn(): {}//iHead.tape_takefromfloor(); Dezyne doesn't allow 
+		 	on iHead.next_bit(): {state = State.busy_3; iTape.moveto3();}
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();} 
+		 }
+		 [state.busy_3]
+		 {
+		 	on iTape.positionIn():{}//iHead.tape_takefromfloor(); Dezyne doesn't allow 
+		 	on iHead.next_bit(): {}
+		 	on iHead.start_clearing(): {state = State.clear_1; iTape.movetoclear1();} 
+		 } 
+		 [state.clear_1]
+		 {
+		 	on iTape.positionOut(): {iTapePusher.push();  iTape.movetoclear2(); state = State.clear_2;}
+		 	//on iTapePusher.pushComplete(): {state = State.clear_2; iTape.movetoclear2();}   clearing procedure
+		 }
+		 [state.clear_2]
+		 {
+		 	on iTape.positionOut(): {iTapePusher.push(); iTape.movetoclear3(); state = State.clear_3;}
+		 	//on iTapePusher.pushComplete(): {state = State.clear_3; iTape.movetoclear3();}	
+		 }
+		 [state.clear_3]
+		 {
+		 	on iTape.positionOut(): {iTapePusher.push(); state=State.waiting;}// iHead.tape_is_clear(); not allowed by Dezyne
+		 	//on iTapePusher.pushComplete(): {state = State.waiting; iTape.dontmove(); iHead.tape_is_clear();}
+		 }		 		 
+	}
+}
+
+
+component Controller   //keeps track of which number we're building, communicates required bitcolours
+						// gives the order to start building, clearing, incrementing (the checking of bits must still be implemented)
+{
+	provides IController iController;
+	requires ILCD iLCD;
+	requires IFloorPicker iFloorPicker;
+	requires IHead iHead;
+	requires IRobotCommunication iRobotCommunication;
+	behaviour 
+	{
+		enum making {off, empty, zero, one, two, three, four, five, six, seven, error, wait};
+		making state = making.off;
+		
+		bool bit1w = false;
+		bool bit2w = false;
+		bool bit3w = false;
+		bool white_sensed = false;
+		bool full = false;
+						
+		on iFloorPicker.black_on_floor(): white_sensed = false;
+		on iFloorPicker.white_on_floor(): white_sensed = true;
+		
+		
+		[state.off] //starts with off
+		{
+		on iController.init():{state = making.empty;}
+		on iController.error():{illegal;}
+		}
+		[state.wait]
+		{
+			on iController.continue(): {iController.resume(); state = making.empty; iFloorPicker.resume();} // pause to wait for other robots to catch up, dont know how to actually pause the current action yet
+		}
+		[state.empty]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing(); iRobotCommunication.controller_error();}
+			on iController.update(): 
+			{
+				state = making.zero; 
+				bit1w = false; bit2w = false; bit3w = false;
+				iHead.start_building();
+			}
+			//on iController.init():{} Dezyne wanted this here
+			on iController.continue():{} //Dezyne wanted this here
+		}
+		[state.zero]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor():{ iHead.next_bit(); iRobotCommunication.controller_took_disk();}  
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();} //checker to mark that the tape is full
+			
+			on iController.update():    // need to manually update the number because Dezyne
+			{
+				iHead.start_clearing(); state = making.one; iHead.start_building();
+				bit1w = false; bit2w = false; bit3w = true; full = false;
+			}
+			on iController.continue():{}//dezyne wanted this here
+		}
+		[state.one]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.two; iHead.start_building();
+				bit1w = false; bit2w = true; bit3w = false; full = false;
+			}
+			on iController.continue():{}//dezyne wanted this here
+		}
+		[state.two]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();} //checker to mark that the tape is full
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.three; iHead.start_building();
+				bit1w = false; bit2w = true; bit3w = true; full = false;
+			} 
+			on iController.continue():{}//dezyne wanted this here
+		}
+		[state.three]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.four; iHead.start_building();
+				bit1w = true; bit2w = false; bit3w = false; full = false;
+			}
+			on iController.continue():{}//dezyne wanted this here
+		}	
+		[state.four]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+			
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.five; iHead.start_building();
+				bit1w = true; bit2w = false; bit3w = true; full = false;
+			}
+			on iController.continue():{}//dezyne wanted this here
+		}	
+		[state.five]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+			
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.six; iHead.start_building();
+				bit1w = true; bit2w = true; bit3w = false; full = false;
+			}
+			on iController.continue():{}//dezyne wanted this here
+		}
+		[state.six]
+		{
+			on iController.error(): {state = making.error;iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.seven; iHead.start_building();
+				bit1w = true; bit2w = true; bit3w = true; full = false;
+			}
+			on iController.continue():{} //dezyne wanted this here
+		}
+		[state.seven]
+		{
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
+			//first bit
+				on iHead.tape_takefromfloor():
+				{
+					if (bit1w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+			//second bit	
+				on iHead.tape_takefromfloor():
+				{
+					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
+		 	//third bit	
+		 		on iHead.tape_takefromfloor():
+				{
+					if (bit3w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
+		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
+		 		}
+			
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full			
+			on iController.update():
+			{
+				iHead.start_clearing(); state = making.zero; iHead.start_building();
+				bit1w = false; bit2w = false; bit3w = false; full = false;
+			}
+			on iController.continue():{} //dezyne wanted this here
+		}
+		[state.error]
+		{
+//!!!Controller must give continue instruction in error state to trigger iHead.start_clearing because inevitable didn't work
+			on iController.continue(): {iHead.start_clearing();} 
+			on iController.error(): {iHead.start_clearing();iRobotCommunication.controller_error();}
+			on iHead.tape_is_clear(): {iRobotCommunication.controller_error_solved(); state = making.zero;}
+			on iController.update():{}
+		}
+	}
+}
+
+
+component FloorPicker
+{
+	requires IFloorSensor iFloorSensor; // used to be provide
+	requires IFloorPusher iFloorPusher; // used to be provide, but i cant order the floorpusher to push if it is a provide relation
+	provides IFloorPicker iFloorPicker;
+	//requires IController iController;
+	behaviour 
+	{
+		enum State {sensing, disk_found, paused};
+		State state = State.sensing;
+		on iFloorPicker.pause(): state = State.paused;
+		[state.sensing]
+		{
+			on iFloorSensor.black_sensed(): {state = State.disk_found; iFloorPicker.black_on_floor();}
+			on iFloorSensor.white_sensed(): {state = State.disk_found; iFloorPicker.white_on_floor();}	 //have to give the command to push to the pusher, cant do that with a provide
+			on iFloorPicker.take_from_floor():{} //Dezyne wanted this here
+		}
+		[state.disk_found]
+		{
+			on iFloorPicker.take_from_floor():{iFloorPusher.push();}
+			on iFloorPusher.completedPushProcedure(): {iFloorPicker.taken_from_floor();}
+		}
+		[state.paused]
+		{
+			on iFloorPicker.resume(): state = State.sensing;
+		}
+	}
+	
+}
+
+component FloorSensor
+{
+	provides IFloorSensor iFloorSensor;
+	behaviour
+	{
+		enum State {single_state};
+		State state = State.single_state;
+		on iFloorSensor.black_comes(): iFloorSensor.black_sensed();
+		on iFloorSensor.white_comes(): iFloorSensor.white_sensed();
+	}
+}
+
+component FloorPusher
+{
+	provides IFloorPusher iFloorPusher;
+	behaviour
+	{
+		enum State {single_state};
+		State state = State.single_state;
+		on iFloorPusher.push(): iFloorPusher.completedPushProcedure();
+	}
+}
+
+component LCD 
+{
+	provides ILCD iLCD;
+	behaviour
+	{	
+		enum State {single_state};
+		State state = State.single_state;
+		on iLCD.getValue():{}
+		on iLCD.showValue():{}
+	}
+}
+
+
+
+component TapePusher 
+{
+	provides ITapePusher iTapePusher;
+	behaviour
+	{
+		enum State {pushing, waiting};
+		State state = State.waiting;
+		[state.waiting]
+		{
+		on iTapePusher.push():{state = State.pushing;}
+		on iTapePusher.backToWaiting():{state = State.waiting;} //stay in same state
+		}
+		[state.pushing]
+		{
+		on iTapePusher.backToWaiting(): {iTapePusher.pushComplete(); state=State.waiting;}
+		on iTapePusher.push():{} //dont do anything
+		}
+	}
+}
+
+component TapeColorSensor
+{
+	provides ITapeColorSensor iTapeColorSensor;
+	behaviour
+	{
+		enum State {single_state}; //always senses
+		State state = State.single_state;
+		on iTapeColorSensor.sense():{iTapeColorSensor.colorSensed();} //sends back the color it sensed
+	}
+}
+
+component DiskSensor
+{
+	provides IDiskSensor iDiskSensor;
+	behaviour
+	{
+		enum State {single_state}; //always senses
+		State state = State.single_state;
+		on iDiskSensor.diskSensed():{iDiskSensor.diskColor();} //Always sends the color of a disk when a disk is sensed
+		}
+}
+
+component Timer 
+{
+	provides ITimer itimer;
+}
+
+component System 
+{
+	//provides IRobotCommunication icommunication;
+	provides IController iController;
+
+	
+	system
+	{
+		Controller controller;
+		Tape tape;
+		LCD lcd;
+		Head head;
+		FloorPicker floorpicker;
+		TapePusher tapepusher;
+		TapeColorSensor tapecolorsensor;
+		DiskSensor disksensor;
+		FloorPusher floorpusher;
+		FloorSensor floorsensor;
+		RobotCommunication robotcommunication;
+		Timer timer;
+		
+		//icommunication <=> robotcommunication.icommunication;
+		iController<=>controller.iController;
+		controller.iHead <=> head.iHead;
+		controller.iLCD<=>lcd.iLCD;
+		controller.iFloorPicker <=> floorpicker.iFloorPicker;
+		controller.iRobotCommunication <=> robotcommunication.iCommunication;
+		head.iDiskSensor <=> disksensor.iDiskSensor;
+		head.iTape <=> tape.iTape;
+		head.iTapePusher <=> tapepusher.iTapePusher;
+		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
+		floorpicker.iFloorPusher<=>floorpusher.iFloorPusher;
+		floorpicker.iFloorSensor<=>floorsensor.iFloorSensor;
+		robotcommunication.iTimer <=> timer.itimer;
+		
+	}	
+}
+
+
+
