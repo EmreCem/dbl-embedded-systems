@@ -40,7 +40,7 @@ interface ITimer {
 		}	
 		
 		[state.Running] {
-			on start: illegal;
+			on start: {}
 			on cancel: state = State.Idle;
 			on inevitable: {
 				state = State.Idle;
@@ -69,6 +69,11 @@ interface IRobotCommunication {
 	out void tookDisk_out();
 	in void tookDisk_in();
 	
+	in void controller_took_disk();	
+	in void controller_error();
+	in void controller_error_solved();
+	in void controller_emergency();
+	
 	out void error_out();
 	in void error_in();
 	
@@ -81,6 +86,10 @@ interface IRobotCommunication {
 		
 		on respondDiskCounters,
 		   respondDisksTaken,
+		   controller_took_disk,
+		   controller_error,
+		   controller_error_solved,
+		   controller_emergency,
 		   error_in,
 		   heartbeat1,
 		   heartbeat2,
@@ -131,7 +140,7 @@ component RobotCommunication
 {
 	provides IRobotCommunication icommunication;
 	requires ITimer itimer;
-	requires IController icontroller;
+	//requires IController icontroller;
 	
 	behaviour
 	{
@@ -145,6 +154,22 @@ component RobotCommunication
 		
 		[state.idle]
 		{
+			on 	icommunication.controller_took_disk(),
+		   	   	icommunication.controller_error(),
+		   		icommunication.controller_error_solved(),
+		   		icommunication.controller_emergency(),
+		   		icommunication.error_in(),
+		   		icommunication.respondDiskCounters(),
+				itimer.timeout(),
+				icommunication.tookDisk_in(),
+				icommunication.emergencyStop(),
+				icommunication.respondDisksTaken(),
+				icommunication.stop(),
+				icommunication.heartbeat1(),
+				icommunication.heartbeat2(),
+				icommunication.heartbeat3(),
+				icommunication.heartbeat4():{}
+				
 			on icommunication.start(): 
 			{
 				state = State.running;
@@ -175,18 +200,27 @@ component RobotCommunication
 			on icommunication.heartbeat3(): r3 = R3.running;
 			on icommunication.heartbeat4(): r4 = R4.running;
 			
-			on icontroller.error_detected(): {state = State.error; icommunication.error_out();}
-			on icontroller.emergency(): {state = State.error; icommunication.emergency();}
-			
+			on icommunication.controller_error(): { state = State.error; icommunication.error_out();}
+			on icommunication.controller_emergency(): {icommunication.emergency(); state = State.error; }
 			on icommunication.respondDisksTaken():{}
 			on icommunication.error_in():{}
 			on icommunication.respondDiskCounters():{}
-			on icontroller.took_disk(): icommunication.tookDisk_out();
+			on icommunication.controller_took_disk(): icommunication.tookDisk_out();
 		}
 		[state.error]
 		{
-			on icontroller.error_solved(): {state = State.running; icommunication.requestDisksTaken();}
-			on icontroller.emergency(): {state = State.error; icommunication.emergency();}
+			on itimer.timeout():
+			{
+				icommunication.heartbeat(); //sends heartbeat every 30 seconds
+				if(r1 == R1.running){r1 = R1.awaiting_h;} else {r1 = R1.dead;} //checks if robots are still on
+				if(r2 == R2.running){r2 = R2.awaiting_h;} else {r2 = R2.dead;} // in on we will set to wait for next heartbeat
+				if(r3 == R3.running){r3 = R3.awaiting_h;} else {r3 = R3.dead;} // if robots have not updated, we will assume dead
+				if(r4 == R4.running){r4 = R4.awaiting_h;} else {r4 = R4.dead;}
+				
+				itimer.start($30$);
+			}
+			on icommunication.controller_error_solved(): {state = State.running; icommunication.requestDisksTaken();}
+			on icommunication.controller_emergency(): {state = State.error; icommunication.emergency();}
 		}
 	}
 }
@@ -309,8 +343,8 @@ interface IController // interface of the controller, keeps track of what we're 
 	out void pause();
 	out void resume();
 	out void increment();
-	out void error_detected();
-	out void error_solved();
+	//out void error_detected();
+	//out void error_solved();
 	out void took_disk();
 	out void emergency();
 
@@ -341,7 +375,6 @@ interface IController // interface of the controller, keeps track of what we're 
 			on error: state = State.error;
 			on update: illegal;
 			on init: illegal;
-			on optional: {state = State.error; emergency;}
 		}
 	}	
 }
@@ -583,7 +616,7 @@ component Controller   //keeps track of which number we're building, communicate
 	requires ILCD iLCD;
 	requires IFloorPicker iFloorPicker;
 	requires IHead iHead;
-	//requires IRobotCommunication iRobotCommunication;
+	requires IRobotCommunication iRobotCommunication;
 	behaviour 
 	{
 		enum making {off, empty, zero, one, two, three, four, five, six, seven, error, wait};
@@ -610,7 +643,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.empty]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing(); iRobotCommunication.controller_error();}
 			on iController.update(): 
 			{
 				state = making.zero; 
@@ -622,7 +655,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.zero]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -630,14 +663,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor():{ iHead.next_bit(); iController.took_disk();}  
+				on iFloorPicker.taken_from_floor():{ iHead.next_bit(); iRobotCommunication.controller_took_disk();}  
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -645,7 +678,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();} //checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();} //checker to mark that the tape is full
 			
 			on iController.update():    // need to manually update the number because Dezyne
 			{
@@ -656,7 +689,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.one]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -664,14 +697,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -679,7 +712,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();}//checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.two; iHead.start_building();
@@ -689,7 +722,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.two]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -697,14 +730,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -712,7 +745,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();} //checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();} //checker to mark that the tape is full
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.three; iHead.start_building();
@@ -722,7 +755,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.three]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -730,14 +763,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -745,7 +778,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();}//checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.four; iHead.start_building();
@@ -755,7 +788,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}	
 		[state.four]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -763,14 +796,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -778,7 +811,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();}//checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.five; iHead.start_building();
@@ -788,7 +821,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}	
 		[state.five]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -796,14 +829,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -811,7 +844,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();}//checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.six; iHead.start_building();
@@ -821,7 +854,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.six]
 		{
-			on iController.error(): {state = making.error;iHead.start_clearing();}
+			on iController.error(): {state = making.error;iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -829,14 +862,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -844,7 +877,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();}//checker to mark that the tape is full
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.seven; iHead.start_building();
@@ -854,7 +887,7 @@ component Controller   //keeps track of which number we're building, communicate
 		}
 		[state.seven]
 		{
-			on iController.error(): {state = making.error; iHead.start_clearing();}
+			on iController.error(): {state = making.error; iHead.start_clearing();iRobotCommunication.controller_error();}
 			//first bit
 				on iHead.tape_takefromfloor():
 				{
@@ -862,14 +895,14 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit1w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 		 		
-				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+				on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 			//second bit	
 				on iHead.tape_takefromfloor():
 				{
 					if (bit2w && white_sensed) {iFloorPicker.take_from_floor();}  // checks if the correct bit is coming
 		 			if (!bit2w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
-		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iController.took_disk();}
+		 		on iFloorPicker.taken_from_floor(): { iHead.next_bit(); iRobotCommunication.controller_took_disk();}
 		 	//third bit	
 		 		on iHead.tape_takefromfloor():
 				{
@@ -877,7 +910,7 @@ component Controller   //keeps track of which number we're building, communicate
 		 			if (!bit3w && !white_sensed) {iFloorPicker.take_from_floor();} // orders to take it if correct	
 		 		}
 			
-			on iFloorPicker.taken_from_floor(): {full = true; iController.took_disk();}//checker to mark that the tape is full			
+			on iFloorPicker.taken_from_floor(): {full = true; iRobotCommunication.controller_took_disk();}//checker to mark that the tape is full			
 			on iController.update():
 			{
 				iHead.start_clearing(); state = making.zero; iHead.start_building();
@@ -889,8 +922,8 @@ component Controller   //keeps track of which number we're building, communicate
 		{
 //!!!Controller must give continue instruction in error state to trigger iHead.start_clearing because inevitable didn't work
 			on iController.continue(): {iHead.start_clearing();} 
-			on iController.error(): {iHead.start_clearing();}
-			on iHead.tape_is_clear(): {iController.error_solved(); state = making.zero;}
+			on iController.error(): {iHead.start_clearing();iRobotCommunication.controller_error();}
+			on iHead.tape_is_clear(): {iRobotCommunication.controller_error_solved(); state = making.zero;}
 			on iController.update():{}
 		}
 	}
@@ -1013,7 +1046,7 @@ component Timer
 
 component System 
 {
-	provides IRobotCommunication icommunication;
+	//provides IRobotCommunication icommunication;
 	provides IController iController;
 
 	
@@ -1032,18 +1065,18 @@ component System
 		RobotCommunication robotcommunication;
 		Timer timer;
 		
-		icommunication <=> robotcommunication.icommunication;
+		//icommunication <=> robotcommunication.icommunication;
 		iController<=>controller.iController;
 		controller.iHead <=> head.iHead;
 		controller.iLCD<=>lcd.iLCD;
 		controller.iFloorPicker <=> floorpicker.iFloorPicker;
+		controller.iRobotCommunication <=> robotcommunication.icommunication;
 		head.iDiskSensor <=> disksensor.iDiskSensor;
 		head.iTape <=> tape.iTape;
 		head.iTapePusher <=> tapepusher.iTapePusher;
 		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
 		floorpicker.iFloorPusher<=>floorpusher.iFloorPusher;
 		floorpicker.iFloorSensor<=>floorsensor.iFloorSensor;
-		robotcommunication.icontroller <=> controller.iController;
 		robotcommunication.itimer <=> timer.itimer;
 		
 	}	
