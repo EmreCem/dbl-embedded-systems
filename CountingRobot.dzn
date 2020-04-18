@@ -81,7 +81,7 @@ interface IRobotCommunication {
 	in void respondDisksTaken();
 	
 	behaviour {
-		enum State { Idle, Running };
+		enum State { Idle, Running, Error };
 		State state = State.Idle;
 		
 		on respondDiskCounters,
@@ -99,15 +99,30 @@ interface IRobotCommunication {
 		
 		[state.Idle] {
 			on start: state = State.Running;
-			on stop: illegal;
+			on stop: {}
 			on emergencyStop: {}
+			//all below required against verification error
+			on controller_emergency:{emergency;}
+			on controller_took_disk:illegal;
+			on controller_error_solved: {requestDisksTaken; state= State.Running;}
+			on respondDisksTaken:illegal;
+			on error_in:illegal;
+			on controller_error:{illegal;}
+			on tookDisk_in:illegal;
+			on heartbeat1:illegal;
+		   	on heartbeat2:illegal;
+		   	on heartbeat3:illegal;
+		   	on heartbeat4:illegal;
+		   	on respondDiskCounters:illegal;
+			on controller_took_disk:illegal;
 		}
 		
 		[state.Running] {
-			on stop, emergencyStop: state = State.Idle;
+			on stop: state = State.Idle;
+			on emergencyStop: state = State.Idle;
 			
-			on optional: {
-				state = State.Idle;
+			on controller_emergency: {
+				state = State.Error;
 				emergency;
 			}
 			
@@ -115,15 +130,16 @@ interface IRobotCommunication {
 				requestDiskCounters;
 			}
 			
-			on optional: {
+			on controller_error_solved: {
 				requestDisksTaken;
 			}
 			
-			on optional: {
+			on controller_error: {
 				error_out;
+				state= State.Error;
 			}
 			
-			on optional: {
+			on controller_took_disk: {
 				tookDisk_out;
 			}
 			
@@ -132,14 +148,35 @@ interface IRobotCommunication {
 			}
 			
 			on start: illegal;
+			}
+			//ADDED THIS BECAUSE ITS NEEDED.
+			[state.Error]
+			{
+				on emergencyStop: {}
+				on respondDisksTaken:illegal;
+				on error_in:illegal;
+				on controller_error:{illegal;}
+				on optional: {
+				heartbeat;
+				}
+				on tookDisk_in:illegal;
+		   		on respondDiskCounters:illegal;
+				on controller_took_disk:illegal;
+				on start:illegal;
+				on stop: illegal;
+				on controller_emergency:{emergency;}
+				on controller_error_solved: {
+				requestDisksTaken;
+				state = State.Running;
+			}
+			}
 		}
 	}
-}
 
 component RobotCommunication 
 {
-	provides IRobotCommunication icommunication;
-	requires ITimer itimer;
+	provides IRobotCommunication iCommunication;
+	requires ITimer iTimer;
 	//requires IController icontroller;
 	
 	behaviour
@@ -154,26 +191,26 @@ component RobotCommunication
 		
 		[state.idle]
 		{
-			on 	icommunication.controller_took_disk(),
-		   	   	icommunication.controller_error(),
-		   		icommunication.controller_error_solved(),
-		   		icommunication.controller_emergency(),
-		   		icommunication.error_in(),
-		   		icommunication.respondDiskCounters(),
-				itimer.timeout(),
-				icommunication.tookDisk_in(),
-				icommunication.emergencyStop(),
-				icommunication.respondDisksTaken(),
-				icommunication.stop(),
-				icommunication.heartbeat1(),
-				icommunication.heartbeat2(),
-				icommunication.heartbeat3(),
-				icommunication.heartbeat4():{}
+			on 	iCommunication.controller_took_disk(),
+		   	   	iCommunication.controller_error(),
+		   		iCommunication.controller_error_solved(),
+		   		iCommunication.controller_emergency(),
+		   		iCommunication.error_in(),
+		   		iCommunication.respondDiskCounters(),
+				iTimer.timeout(),
+				iCommunication.tookDisk_in(),
+				iCommunication.respondDisksTaken(),
+				iCommunication.emergencyStop(),
+				iCommunication.heartbeat1(),
+				iCommunication.heartbeat2(),
+				iCommunication.heartbeat3(),
+				iCommunication.heartbeat4(),
+				iCommunication.stop():{}
 				
-			on icommunication.start(): 
+			on iCommunication.start(): 
 			{
 				state = State.running;
-				itimer.start($30$);
+				iTimer.start($30$);
 				r1 = R1.unconnected; // initialized all robots as unconnected on startup
 				r2 = R2.unconnected;
 				r3 = R3.unconnected;
@@ -182,45 +219,51 @@ component RobotCommunication
 		}
 		[state.running]
 		{
-			on icommunication.stop(): state = State.idle;
-			on icommunication.emergencyStop(): state = State.idle;
+			on iCommunication.stop(): state = State.idle;
+			on iCommunication.emergencyStop(): state = State.idle;
 			
-			on itimer.timeout():
+			on iTimer.timeout():
 			{
-				icommunication.heartbeat(); //sends heartbeat every 30 seconds
+				iCommunication.heartbeat(); //sends heartbeat every 30 seconds
 				if(r1 == R1.running){r1 = R1.awaiting_h;} else {r1 = R1.dead;} //checks if robots are still on
 				if(r2 == R2.running){r2 = R2.awaiting_h;} else {r2 = R2.dead;} // in on we will set to wait for next heartbeat
 				if(r3 == R3.running){r3 = R3.awaiting_h;} else {r3 = R3.dead;} // if robots have not updated, we will assume dead
 				if(r4 == R4.running){r4 = R4.awaiting_h;} else {r4 = R4.dead;}
 				
-				itimer.start($30$);
+				iTimer.start($30$);
 			}
-			on icommunication.heartbeat1(): r1 = R1.running;  // updates state of robots when receiving heartbeat
-			on icommunication.heartbeat2(): r2 = R2.running;
-			on icommunication.heartbeat3(): r3 = R3.running;
-			on icommunication.heartbeat4(): r4 = R4.running;
-			
-			on icommunication.controller_error(): { state = State.error; icommunication.error_out();}
-			on icommunication.controller_emergency(): {icommunication.emergency(); state = State.error; }
-			on icommunication.respondDisksTaken():{}
-			on icommunication.error_in():{}
-			on icommunication.respondDiskCounters():{}
-			on icommunication.controller_took_disk(): icommunication.tookDisk_out();
+			on iCommunication.heartbeat1(): r1 = R1.running;  // updates state of robots when receiving heartbeat
+			on iCommunication.heartbeat2(): r2 = R2.running;
+			on iCommunication.heartbeat3(): r3 = R3.running;
+			on iCommunication.heartbeat4(): r4 = R4.running;
+			on iCommunication.tookDisk_in():{}
+			on iCommunication.controller_error(): { state = State.error; iCommunication.error_out();}
+			on iCommunication.controller_emergency(): {iCommunication.emergency(); state = State.error; }
+			on iCommunication.respondDisksTaken():{}
+			on iCommunication.error_in():{}
+			on iCommunication.respondDiskCounters():{}
+			on iCommunication.controller_error_solved():{}
+			on iCommunication.controller_took_disk(): {state = State.running; iCommunication.tookDisk_out();}
 		}
 		[state.error]
 		{
-			on itimer.timeout():
+			on iTimer.timeout():
 			{
-				icommunication.heartbeat(); //sends heartbeat every 30 seconds
+				iCommunication.heartbeat(); //sends heartbeat every 30 seconds
 				if(r1 == R1.running){r1 = R1.awaiting_h;} else {r1 = R1.dead;} //checks if robots are still on
 				if(r2 == R2.running){r2 = R2.awaiting_h;} else {r2 = R2.dead;} // in on we will set to wait for next heartbeat
 				if(r3 == R3.running){r3 = R3.awaiting_h;} else {r3 = R3.dead;} // if robots have not updated, we will assume dead
 				if(r4 == R4.running){r4 = R4.awaiting_h;} else {r4 = R4.dead;}
 				
-				itimer.start($30$);
+				iTimer.start($30$);
 			}
-			on icommunication.controller_error_solved(): {state = State.running; icommunication.requestDisksTaken();}
-			on icommunication.controller_emergency(): {state = State.error; icommunication.emergency();}
+			on iCommunication.controller_error_solved(): {state = State.running; iCommunication.requestDisksTaken();}
+			on iCommunication.controller_emergency(): {state = State.error; iCommunication.emergency();}
+			on iCommunication.emergencyStop(): {}
+			on iCommunication.heartbeat1(): r1 = R1.running;  // updates state of robots when receiving heartbeat
+			on iCommunication.heartbeat2(): r2 = R2.running;
+			on iCommunication.heartbeat3(): r3 = R3.running;
+			on iCommunication.heartbeat4(): r4 = R4.running;
 		}
 	}
 }
@@ -1070,14 +1113,14 @@ component System
 		controller.iHead <=> head.iHead;
 		controller.iLCD<=>lcd.iLCD;
 		controller.iFloorPicker <=> floorpicker.iFloorPicker;
-		controller.iRobotCommunication <=> robotcommunication.icommunication;
+		controller.iRobotCommunication <=> robotcommunication.iCommunication;
 		head.iDiskSensor <=> disksensor.iDiskSensor;
 		head.iTape <=> tape.iTape;
 		head.iTapePusher <=> tapepusher.iTapePusher;
 		head.iTapeColorSensor <=> tapecolorsensor.iTapeColorSensor;
 		floorpicker.iFloorPusher<=>floorpusher.iFloorPusher;
 		floorpicker.iFloorSensor<=>floorsensor.iFloorSensor;
-		robotcommunication.itimer <=> timer.itimer;
+		robotcommunication.iTimer <=> timer.itimer;
 		
 	}	
 }
