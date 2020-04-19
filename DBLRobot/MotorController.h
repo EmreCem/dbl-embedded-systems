@@ -3,32 +3,39 @@
 #include <vector>
 
 class MotorController {
+private:
+	int leftPin = 0;
+	int rightPin = 0;
 public:
-	static void Setup(std::vector<int> pins);
-	static void MoveMotorClockwise(int leftPin, int rightPin);
-	static void MoveMotorCounterClockwise(int leftPin, int rightPin);
-	static void StopMotor(int leftPin, int rightPin);
-	static void StopAllMotors();
+	MotorController(int leftPin, int rightPin);
+	void Setup();
+	void MoveClockwise();
+	void MoveCounterClockwise();
+	void Stop();
 };
 
 
-inline void MotorController::Setup(std::vector<int> pins) {
-	for (int pin : pins) {
-		pinMode(pin, OUTPUT);
-	}
+inline MotorController::MotorController(int leftPin, int rightPin) {
+	this->leftPin = leftPin;
+	this->rightPin = rightPin;
 }
 
-inline void MotorController::MoveMotorClockwise(int leftPin, int rightPin) {
-	//digitalWrite(leftPin, 1);
-	//digitalWrite(rightPin, 0);
+inline void MotorController::Setup() {
+	pinMode(leftPin, OUTPUT);
+	pinMode(rightPin, OUTPUT);
 }
 
-inline void MotorController::MoveMotorCounterClockwise(int leftPin, int rightPin) {
-	//digitalWrite(leftPin, 0);
-	//digitalWrite(rightPin, 1);
+inline void MotorController::MoveClockwise() {
+	digitalWrite(leftPin, 1);
+	digitalWrite(rightPin, 0);
 }
 
-inline void MotorController::StopMotor(int leftPin, int rightPin) {
-	//digitalWrite(leftPin, 0);
-	//digitalWrite(rightPin, 0);
+inline void MotorController::MoveCounterClockwise() {
+	digitalWrite(leftPin, 0);
+	digitalWrite(rightPin, 1);
+}
+
+inline void MotorController::Stop() {
+	digitalWrite(leftPin, 0);
+	digitalWrite(rightPin, 0);
 }

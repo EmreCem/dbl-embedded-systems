@@ -1,14 +1,15 @@
 #pragma once
 
 namespace Globals {
-	int BeltMotorLeftPin = 0;
-	int BeltMotorRightPin = 0;
-	int FactoryPusherLeftPin = 0;
-	int FactoryPusherRightPin = 0;
-	int BeltPusherLeftPin = 0;
-	int BeltPusherRightPin = 0;
+	extern int BeltMotorLeftPin = 6;
+	extern int BeltMotorRightPin = 13;
+	extern int FactoryBeltLeftPin = 11;
+	extern int FactoryBeltRightPin = 9;
+	extern int FactoryPusherLeftPin = 5;
+	extern int FactoryPusherRightPin = 0;
+	extern int BeltPusherLeftPin = 26;
+	extern int BeltPusherRightPin = 19;
 
-	int BeltPresenceSensorPin = 0;
-	int FactoryPresenceSensorPin = 0;
-	
+	extern int BeltPresenceSensorPin = 2;
+	extern int FactoryPresenceSensorPin = 3;
 }

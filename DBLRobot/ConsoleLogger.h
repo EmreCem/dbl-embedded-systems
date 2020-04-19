@@ -8,10 +8,12 @@ class ConsoleLogger : public ILogger {
 public:
 	void LogError(std::string message) override;
 	void LogDebug(std::string message) override;
+	void LogDebug(int message);
 	void LogCount(std::string message) override;
 	void LogMessage(std::string message) override;
 private:
 	void Log(std::string&& prefix, std::string message);
+	void Log(std::string&& prefix, int message);
 };
 
 inline void ConsoleLogger::LogError(std::string message) {
@@ -19,6 +21,10 @@ inline void ConsoleLogger::LogError(std::string message) {
 }
 
 inline void ConsoleLogger::LogDebug(std::string message) {
+	Log("DBG", message);
+}
+
+inline void ConsoleLogger::LogDebug(int message) {
 	Log("DBG", message);
 }
 
@@ -35,3 +41,10 @@ inline void ConsoleLogger::Log(std::string&& prefix, const std::string message) 
 	auto timeString = date::format("%H:%M:%S", timeNow);
 	std::cout << "[" << timeString << "][" << prefix << "] " << message << "\n";
 }
+
+inline void ConsoleLogger::Log(std::string&& prefix, int message) {
+	auto timeNow = std::chrono::system_clock::now();
+	auto timeString = date::format("%H:%M:%S", timeNow);
+	std::cout << "[" << timeString << "][" << prefix << "] " << message << "\n";
+}
+
