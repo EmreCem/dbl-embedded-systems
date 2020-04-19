@@ -9,7 +9,7 @@
 #include "SensorReader.h"
 #include "Globals.h"
 #include <wiringPi.h>
-//#include "Client.h"
+#include "Client.h"
 #include <string>
 
 ConsoleLogger logger{};
@@ -18,6 +18,9 @@ MotorController beltMotor(Globals::BeltMotorLeftPin, Globals::BeltMotorRightPin)
 MotorController pusherMotor(Globals::BeltPusherLeftPin, Globals::BeltPusherRightPin);
 MotorController factoryBeltMotor(Globals::FactoryBeltLeftPin, Globals::FactoryBeltRightPin);
 MotorController factoryPusherMotor(Globals::FactoryPusherLeftPin, Globals::FactoryPusherRightPin);
+Client client("SWGBON", "86.91.204.180", 1883, &logger);
+std::thread clientThread{};
+bool solo = true;
 
 void LogicLoop();
 std::string DiskBinary(int Num) // Returns string with disk colors needed to make the number
@@ -39,25 +42,25 @@ std::string DiskBinary(int Num) // Returns string with disk colors needed to mak
 	return DiskString;
 }
 
-//void HandleEmergency(MotorController* motor = nullptr, bool wasClockwise = true) {
-//	bool isEmergency = false;
-//	while (client.isEmergency) {
-//		if (motor != nullptr) {
-//			motor->Stop();
-//		}
-//		isEmergency = true;
-//		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
-//	}
-//
-//	if (isEmergency) {
-//		logger.LogDebug("Resuming operation.");
-//		if (wasClockwise && motor != nullptr) {
-//			motor->MoveClockwise();
-//		} else if (motor != nullptr) {
-//			motor->MoveCounterClockwise();
-//		}
-//	}
-//}
+void HandleEmergency(MotorController* motor = nullptr, bool wasClockwise = true) {
+	bool isEmergency = false;
+	while (client.isEmergency) {
+		if (motor != nullptr) {
+			motor->Stop();
+		}
+		isEmergency = true;
+		std::this_thread::sleep_for(std::chrono::milliseconds(5000));
+	}
+
+	if (isEmergency) {
+		logger.LogDebug("Resuming operation.");
+		if (wasClockwise && motor != nullptr) {
+			motor->MoveClockwise();
+		} else if (motor != nullptr) {
+			motor->MoveCounterClockwise();
+		}
+	}
+}
 
 void HandleFault() {
 	logger.LogError("Error detected. Please fix within 25 seconds.");
@@ -90,7 +93,7 @@ void DetectFaultWhileMoving(int pos, std::string currentDisks, bool goingRight) 
 	}
 
 	while (true) {
-		//HandleEmergency(&beltMotor, goingRight);
+		HandleEmergency(&beltMotor, goingRight);
 		
 		// Check if the tape is on the next border
 		auto rgbValue = sensor.ReadBeltRGBSensor();
@@ -151,9 +154,9 @@ int MoveBeltRight(int CurrRampPos, std::string currentDisks) {
 	logger.LogDebug("On pink");
 	beltMotor.MoveClockwise();
 	logger.LogDebug("Started moving right");
-	//HandleEmergency(&beltMotor, true);
+	HandleEmergency(&beltMotor, true);
 	std::this_thread::sleep_for(std::chrono::milliseconds(8000));
-	//HandleEmergency(&beltMotor, true);
+	HandleEmergency(&beltMotor, true);
 	DetectFaultWhileMoving(CurrRampPos, currentDisks, true);
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -193,18 +196,18 @@ void PushOffBelt() {
 }
 
 void PushOffFactory() {
-	//HandleEmergency();
+	HandleEmergency();
 	std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-	//HandleEmergency();
+	HandleEmergency();
 	// First move to block the belt
 	factoryPusherMotor.MoveCounterClockwise();
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	factoryPusherMotor.Stop();
 	
-	//HandleEmergency();	
+	HandleEmergency();	
 	// Wait for disk to get into the slot
-	std::this_thread::sleep_for(std::chrono::milliseconds(13000));
-	//HandleEmergency();
+	std::this_thread::sleep_for(std::chrono::milliseconds(14000));
+	HandleEmergency();
 	
 	logger.LogDebug("Start swinging");
 	factoryPusherMotor.MoveClockwise();
@@ -219,14 +222,14 @@ void FindDisk(char Disk) {
 	logger.LogDebug("Getting a disk off the factory floor.");
 	
 	while (!found) {
-		//HandleEmergency();
+		HandleEmergency();
 		while (!sensor.ReadFactoryPresenceSensor()) {
-			/*if (client.shouldStop) {
+			if (client.shouldStop) {
 				logger.LogDebug("Stopping fetching a disk.");
 				break;
-			*///}
+			}
 
-			//HandleEmergency();
+			HandleEmergency();
 			
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
@@ -235,9 +238,9 @@ void FindDisk(char Disk) {
 				logger.LogDebug("Black disk found, taking off.");
 				found = true;		
 				PushOffFactory();
-				//if (!solo) {
-				//	//client.diskTaken();
-				//}
+				if (!solo) {
+					client.diskTaken();
+				}
 			}
 		}
 
@@ -246,9 +249,9 @@ void FindDisk(char Disk) {
 				logger.LogDebug("White disk found");
 				found = true;
 				PushOffFactory();
-				//if (!solo) {
-				//	//client.diskTaken();
-				//}
+				if (!solo) {
+					client.diskTaken();
+				}
 			}
 		}
 	}
@@ -306,13 +309,17 @@ void Calibrate() {
 			LogicLoop();
 			break;
 		case 10:
-			//solo = false;
-			//std::cout << "Please enter the robot's ID: ";
-			//std::cin >> robotId;
-			//clientThread = std::thread(&Client::main_loop, &client, robotId, &factoryBeltMotor);
+			solo = false;
+			std::cout << "Please enter the robot's ID: ";
+			std::cin >> robotId;
+			clientThread = std::thread(&Client::main_loop, &client, robotId, &factoryBeltMotor);
+			break;
+		case 11:
+			calibrating = false;
+			LogicLoop();
 			break;
 		case 12:
-			//client.requestDisksTaken();
+			client.requestDisksTaken();
 			break;
 		default:
 			break;
@@ -368,7 +375,7 @@ void PushOffAll(std::string currentDisks, int rampPos) {
 }
 
 void LogicLoop() {
-	int num = 1;
+	int num = 4;
 	std::string numAsDisks;
 	std::string currentDisks = "eee";
 	char neededDisk;
@@ -378,8 +385,10 @@ void LogicLoop() {
 	bool initial = true;
 
 	// taken care of by mqtt
-	factoryBeltMotor.MoveClockwise();
-	
+	if (solo) {
+		factoryBeltMotor.MoveClockwise();
+	}
+
 	while (num <= 7) {
 		numAsDisks = DiskBinary(num);
 
@@ -400,12 +409,12 @@ void LogicLoop() {
 			}
 		}
 
-		/*if (client.shouldStop) {
+		if (client.shouldStop) {
 			PushOffAll(currentDisks, rampPos);
 			break;
-		}*/
+		}
 
-		//HandleEmergency();
+		HandleEmergency();
 		
 		while (numAsDisks != currentDisks) {
 			// Keep collecting disks until all needed disks are aquired
@@ -414,33 +423,33 @@ void LogicLoop() {
 			logger.LogDebug("Needed position to put new disk: " + std::to_string(neededPos));
 			logger.LogDebug("Current ramp pos: " + std::to_string(rampPos));
 
-			/*if (client.shouldStop) {
+			if (client.shouldStop) {
 				PushOffAll(currentDisks, rampPos);
 				num = 10;
 				break;
-			}*/
+			}
 
-			//HandleEmergency();
+			HandleEmergency();
 			
 			MoveBeltToDesiredPos(&rampPos, neededPos, currentDisks);
 
-			/*if (client.shouldStop) {
+			if (client.shouldStop) {
 				PushOffAll(currentDisks, rampPos);
 				num = 10;
 				break;
-			}*/
+			}
 
-			//HandleEmergency();
+			HandleEmergency();
 			
 			neededDisk = numAsDisks[numAsDisks.size() - 1 - neededPos]; // Disk needed to form binary number
 			logger.LogDebug("Needed Disk: " + neededDisk);
 
 			// Get needed disk from the conveyor belt
-			/*if (!solo) {
+			if (!solo) {
 				while (!client.allowedToTakeDisk()) {
 					std::this_thread::sleep_for(std::chrono::milliseconds(400));
 				}
-			}*/
+			}
 			FindDisk(neededDisk);
 			currentDisks[currentDisks.size() - 1 - neededPos] = neededDisk;
 			logger.LogDebug("Num as disks: " + numAsDisks + ", currentDisks = " + currentDisks);

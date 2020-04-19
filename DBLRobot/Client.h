@@ -24,20 +24,20 @@ public:
     void parse_message(std::string message);
     void publish_message(std::string message);
     void main_loop(char, MotorController*);
-    //void check_heartbeats();
-    /*void diskTaken();
+    void check_heartbeats();
+    void diskTaken();
     bool allowedToTakeDisk();
-    //void requestDisksTaken();
+    void requestDisksTaken();
 
     unsigned int heartbeat1LastReceived = 0;
     unsigned int heartbeat2LastReceived = 0;
     unsigned int heartbeat3LastReceived = 0;
     unsigned int heartbeat4LastReceived = 0;
 
-    bool robot1Ignored = false;
-    bool robot2Ignored = false;
-    bool robot3Ignored = false;
-    bool robot4Ignored = false;
+    bool robot1Ignored = true;
+    bool robot2Ignored = true;
+    bool robot3Ignored = true;
+    bool robot4Ignored = true;
 
     int robot1Counter = 0;
     int robot2Counter = 0;

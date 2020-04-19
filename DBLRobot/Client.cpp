@@ -67,21 +67,25 @@ void Client::parse_message(std::string message) {
 	}
 	
 	if (message == "heartbeat1") {
+		robot1Ignored = false;
 		_logger->LogDebug("Heartbeat with ID 1 received. Updating last arrived time.");
 		heartbeat1LastReceived = millis();
 	}
 
 	if (message == "heartbeat2") {
+		robot2Ignored = false;
 		_logger->LogDebug("Heartbeat with ID 2 received. Updating last arrived time.");
 		heartbeat2LastReceived = millis();
 	}
 
 	if (message == "heartbeat3") {
+		robot3Ignored = false;
 		_logger->LogDebug("Heartbeat with ID 3 received. Updating last arrived time.");
 		heartbeat3LastReceived = millis();
 	}
 
 	if (message == "heartbeat4") {
+		robot4Ignored = false;
 		_logger->LogDebug("Heartbeat with ID 4 received. Updating last arrived time.");
 		heartbeat4LastReceived = millis();
 	}
@@ -213,21 +217,25 @@ void Client::check_heartbeats() {
 	if (heartbeat1LastReceived != 0 && millis() - heartbeat1LastReceived > 60000) {
 		_logger->LogDebug("Robot 1 has died.");
 		heartbeat1LastReceived = 0;
+		robot1Ignored = true;
 	}
 
 	if (heartbeat2LastReceived != 0 && millis() - heartbeat2LastReceived > 60000) {
 		_logger->LogDebug("Robot 2 has died.");
 		heartbeat2LastReceived = 0;
+		robot2Ignored = true;
 	}
 
 	if (heartbeat3LastReceived != 0 && millis() - heartbeat3LastReceived > 60000) {
 		_logger->LogDebug("Robot 3 has died.");
 		heartbeat3LastReceived = 0;
+		robot3Ignored = true;
 	}
 
 	if (heartbeat4LastReceived != 0 && millis() - heartbeat4LastReceived > 60000) {
 		_logger->LogDebug("Robot 4 has died.");
 		heartbeat4LastReceived = 0;
+		robot4Ignored = true;
 	}
 }
 
